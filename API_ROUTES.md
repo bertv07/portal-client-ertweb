@@ -19,7 +19,7 @@
 |--------|----------|------|-------------|
 | GET | `/users` | Admin | Lista todos los clientes |
 | GET | `/users/{id}` | Admin | Obtiene un cliente |
-| POST | `/users` | Admin | Crea cliente. Body: `{name, email, password, role?}` |
+| POST | `/users` | Admin o n8n | Crea cliente. Body: `{name, email, password}`. Acepta `X-N8N-API-Key` además del JWT de admin. El rol siempre se fuerza a `client`. |
 | PUT | `/users/{id}` | Admin | Actualiza cliente. Body: `{name?, email?, password?, avatar_url?}` |
 | DELETE | `/users/{id}` | Admin | Elimina cliente |
 
@@ -132,7 +132,7 @@ La contraseña de admin ya NO es fija en el código — se define en `backend/.e
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/auth/login \
-  -d "username=admin@ertweb.com&password=<ADMIN_DEFAULT_PASSWORD del .env>" \
+  -d "username=gleybertmartinez0702@gmail.com&password=<ADMIN_DEFAULT_PASSWORD del .env>" \
   -H "Content-Type: application/x-www-form-urlencoded"
 ```
 
@@ -146,18 +146,21 @@ Usar en headers: `Authorization: Bearer eyJ...`
 
 ## 📝 Ejemplo n8n — Registrar cliente tras aprobar el pago
 
+No hace falta token JWT: basta con la clave `N8N_API_KEY` del `.env` en el header `X-N8N-API-Key` (igual que en pagos manuales).
+
 ```json
 POST /api/v1/users/
-Authorization: Bearer {{token}}
+X-N8N-API-Key: {{N8N_API_KEY}}
 Content-Type: application/json
 
 {
   "email": "{{cliente_email}}",
   "name": "{{cliente_nombre}}",
-  "password": "{{password_temporal_generada}}",
-  "role": "client"
+  "password": "{{password_temporal_generada}}"
 }
 ```
+
+El rol siempre queda como `client` (no se pueden crear admins por esta vía).
 
 Devuelve el `id` del cliente creado — guárdalo para los siguientes pasos del flujo (crear proyecto, factura, notificación de bienvenida, etc.)
 

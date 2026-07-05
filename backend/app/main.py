@@ -10,7 +10,7 @@ from app.routers import notifications, auth, projects, invoices, documents, user
 from sqlalchemy import select
 from app.core.database import SessionLocal
 from app.models.user import User
-from app.core.security import get_password_hash
+from app.core.security import get_password_hash, verify_password
 
 logger = logging.getLogger(__name__)
 
@@ -55,10 +55,22 @@ app.include_router(manual_payments.router, prefix=settings.API_V1_STR)
 async def startup_event():
     # Seed default users
     async with SessionLocal() as db:
-        admin_email = "admin@ertweb.com"
+        admin_email = "gleybertmartinez0702@gmail.com"
+        admin_name = "ert"
         result = await db.execute(select(User).where(User.email == admin_email))
         admin = result.scalar_one_or_none()
-        
+
+        if not admin:
+            # Migrar el admin del seed anterior si existe en la BD (evita duplicados
+            # y que quede una cuenta admin vieja con password desconocida)
+            result = await db.execute(select(User).where(User.email == "admin@ertweb.com"))
+            admin = result.scalar_one_or_none()
+            if admin:
+                admin.email = admin_email
+                admin.name = admin_name
+                logger.warning("Admin admin@ertweb.com migrado a %s", admin_email)
+
+
         client_email = "client@example.com"
         result_client = await db.execute(select(User).where(User.email == client_email))
         client = result_client.scalar_one_or_none()
@@ -72,11 +84,18 @@ async def startup_event():
                 )
             admin = User(
                 email=admin_email,
-                name="Alex Admin",
+                name=admin_name,
                 password_hash=get_password_hash(admin_password),
                 role="admin"
             )
             db.add(admin)
+        elif settings.ADMIN_DEFAULT_PASSWORD and not verify_password(
+            settings.ADMIN_DEFAULT_PASSWORD, admin.password_hash
+        ):
+            # El .env es la fuente de verdad: si ADMIN_DEFAULT_PASSWORD cambió
+            # después del primer arranque, sincronizamos el hash guardado.
+            admin.password_hash = get_password_hash(settings.ADMIN_DEFAULT_PASSWORD)
+            logger.warning("Password de %s actualizada desde ADMIN_DEFAULT_PASSWORD", admin_email)
 
         if not client:
             client_password = settings.CLIENT_DEFAULT_PASSWORD or secrets.token_urlsafe(12)
@@ -92,7 +111,12 @@ async def startup_event():
                 role="client"
             )
             db.add(client)
-            
+        elif settings.CLIENT_DEFAULT_PASSWORD and not verify_password(
+            settings.CLIENT_DEFAULT_PASSWORD, client.password_hash
+        ):
+            client.password_hash = get_password_hash(settings.CLIENT_DEFAULT_PASSWORD)
+            logger.warning("Password de %s actualizada desde CLIENT_DEFAULT_PASSWORD", client_email)
+
         await db.commit()
         await db.refresh(client)
         

@@ -9,7 +9,7 @@ from app.core.database import get_db
 from app.core.security import get_password_hash
 from app.models.user import User
 from app.schemas.user import UserCreate, UserResponse
-from app.api.deps import get_current_admin_user
+from app.api.deps import get_current_admin_user, require_admin_or_n8n
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -51,9 +51,17 @@ async def get_user(
 async def create_client(
     user_in: UserCreate,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(get_current_admin_user),
+    caller: str = Depends(require_admin_or_n8n),
 ):
-    """Admin: create a new client account."""
+    """Admin / n8n: create a new client account.
+
+    Autenticación aceptada:
+      - Header  X-N8N-API-Key: <clave>   (para que la automatización registre clientes)
+      - Bearer JWT de admin              (para la web)
+
+    El rol siempre se fuerza a "client": ni n8n ni un admin pueden crear
+    otros admins por esta vía.
+    """
     # Check email unique
     stmt = select(User).where(User.email == user_in.email)
     result = await db.execute(stmt)
