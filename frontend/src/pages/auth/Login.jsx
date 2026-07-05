@@ -1,110 +1,180 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { motion } from 'motion/react';
+import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+
+const EASE_OUT = [0.16, 1, 0.3, 1]; // expo.out
+
+const container = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.09, delayChildren: 0.1 } },
+};
+
+const item = {
+  hidden: { opacity: 0, y: 18 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: EASE_OUT } },
+};
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  
-  const { login } = useAuth();
+
+  const { login, user } = useAuth();
   const navigate = useNavigate();
+  const emailRef = useRef(null);
+
+  useEffect(() => {
+    emailRef.current?.focus();
+  }, []);
+
+  // Ya hay una sesión activa — no tiene sentido mostrar el login de nuevo.
+  useEffect(() => {
+    if (user) {
+      navigate(user.role === 'admin' ? '/admin' : '/dashboard', { replace: true });
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
-    
+
     try {
-      const user = await login(email, password);
-      // Redirect based on role
-      if (user.role === 'admin') {
-        navigate('/admin');
-      } else {
-        navigate('/dashboard');
-      }
+      const loggedUser = await login(email, password);
+      navigate(loggedUser.role === 'admin' ? '/admin' : '/dashboard', { replace: true });
     } catch (err) {
-      setError('Credenciales incorrectas. Por favor, intenta de nuevo.');
+      if (!err.response) {
+        setError('No se pudo conectar con el servidor. Intenta de nuevo en unos segundos.');
+      } else if (err.response.status === 400 || err.response.status === 401) {
+        setError('Correo o contraseña incorrectos.');
+      } else {
+        setError('Ocurrió un error inesperado. Intenta de nuevo.');
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Client Portal
-        </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Ingresa para gestionar tus proyectos
-        </p>
+    <div className="relative min-h-screen overflow-hidden bg-[#0d0d0d] flex items-center justify-center px-4 py-10 font-sans">
+      {/* Fondo: glow radial morado, igual espíritu que el hero de ertweb.com */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -top-32 -left-24 w-[26rem] h-[26rem] rounded-full bg-brand-600/30 blur-[100px]" />
+        <div className="absolute -bottom-32 -right-16 w-[24rem] h-[24rem] rounded-full bg-accent-500/20 blur-[110px]" />
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10 border border-gray-100">
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Correo Electrónico
+      <motion.div
+        variants={container}
+        initial="hidden"
+        animate="show"
+        className="relative w-full max-w-sm"
+      >
+        {/* Marca */}
+        <motion.div variants={item} className="flex flex-col items-center mb-8 text-center">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center shadow-lg shadow-brand-600/30 mb-4">
+            <span className="text-white font-black text-lg">E</span>
+          </div>
+          <h1 className="text-2xl font-extrabold text-white tracking-tight">Portal de Clientes</h1>
+          <p className="mt-1.5 text-sm text-white/40">Diseño que piensa. Código que siente.</p>
+        </motion.div>
+
+        {/* Card */}
+        <motion.div
+          variants={item}
+          className="bg-white/[0.04] backdrop-blur-xl border border-white/10 rounded-[28px] p-7 shadow-2xl shadow-black/40"
+        >
+          <form className="space-y-5" onSubmit={handleSubmit} noValidate>
+            <div className="space-y-1.5">
+              <label htmlFor="email" className="block text-xs font-semibold text-white/60 uppercase tracking-wider">
+                Correo electrónico
               </label>
-              <div className="mt-1">
+              <div className="relative">
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
                 <input
+                  ref={emailRef}
                   id="email"
                   name="email"
                   type="email"
                   autoComplete="email"
                   required
+                  disabled={isLoading}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-brand-500 focus:border-brand-500 sm:text-sm"
+                  placeholder="tu@email.com"
+                  className="w-full bg-transparent border border-white/10 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-white placeholder-white/25 transition-colors focus:outline-none focus:border-brand-400 disabled:opacity-50"
                 />
               </div>
             </div>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+            <div className="space-y-1.5">
+              <label htmlFor="password" className="block text-xs font-semibold text-white/60 uppercase tracking-wider">
                 Contraseña
               </label>
-              <div className="mt-1">
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
                 <input
                   id="password"
                   name="password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   required
+                  disabled={isLoading}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-brand-500 focus:border-brand-500 sm:text-sm"
+                  placeholder="••••••••"
+                  className="w-full bg-transparent border border-white/10 rounded-xl pl-10 pr-10 py-2.5 text-sm text-white placeholder-white/25 transition-colors focus:outline-none focus:border-brand-400 disabled:opacity-50"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/70 transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 
             {error && (
-              <div className="text-red-500 text-sm font-medium text-center bg-red-50 py-2 rounded-md">
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-2 text-red-300 text-xs font-medium bg-red-500/10 border border-red-500/20 px-3.5 py-2.5 rounded-xl"
+              >
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                 {error}
-              </div>
+              </motion.div>
             )}
 
-            <div>
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 disabled:opacity-50 transition-colors"
-              >
-                {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
-              </button>
-            </div>
-            
-            <div className="mt-4 text-xs text-center text-gray-500">
-              <p>Credenciales de prueba:</p>
-              <p>client@example.com / client123</p>
-              <p>admin@ertweb.com / admin123</p>
-            </div>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="group w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white bg-brand-600 transition-all duration-300 hover:bg-brand-500 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-brand-600/40 disabled:opacity-60 disabled:pointer-events-none"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Iniciando sesión...
+                </>
+              ) : (
+                <>
+                  Iniciar sesión
+                  <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                </>
+              )}
+            </button>
           </form>
-        </div>
-      </div>
+        </motion.div>
+
+        <motion.p variants={item} className="mt-6 text-center text-xs text-white/25">
+          ErtWeb &middot; Portal de Clientes
+        </motion.p>
+      </motion.div>
     </div>
   );
 }

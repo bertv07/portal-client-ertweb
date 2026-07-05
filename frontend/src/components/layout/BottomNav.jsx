@@ -2,37 +2,30 @@ import { Home, FolderOpen, Wallet, Calendar, Settings } from 'lucide-react';
 import { NavLink } from 'react-router';
 import clsx from 'clsx';
 
-export default function BottomNav() {
-  const navItems = [
-    { path: '/documents', icon: FolderOpen },
-    { path: '/schedule', icon: Calendar },
-    { path: '/dashboard', icon: Home, isMain: true },
-    { path: '/billing', icon: Wallet },
-    { path: '/maintenance', icon: Settings },
-  ];
+const NAV_ITEMS = [
+  { path: '/documents', icon: FolderOpen, label: 'Documentos' },
+  { path: '/schedule', icon: Calendar, label: 'Agenda' },
+  { path: '/dashboard', icon: Home, label: 'Inicio' },
+  { path: '/billing', icon: Wallet, label: 'Pagos' },
+  { path: '/maintenance', icon: Settings, label: 'Soporte' },
+];
 
+export default function BottomNav() {
   return (
-    <nav className="absolute bottom-0 w-full bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.05)] px-6 py-4 flex justify-between items-center z-50">
-      {navItems.map((item) => (
-        <NavLink
-          key={item.path}
-          to={item.path}
-          className={({ isActive }) => clsx(
-            "flex items-center justify-center transition-all duration-300",
-            item.isMain 
-              ? "w-14 h-14 -mt-8 rounded-full shadow-lg border-4 border-white"
-              : "w-10 h-10 rounded-xl",
-            isActive && item.isMain ? "bg-brand-700 text-white shadow-brand-500/30" : "",
-            !isActive && item.isMain ? "bg-brand-600 text-white hover:bg-brand-700" : "",
-            isActive && !item.isMain ? "bg-brand-100 text-brand-700" : "",
-            !isActive && !item.isMain ? "text-gray-400 hover:text-brand-500 hover:bg-brand-50" : ""
-          )}
-        >
-          <item.icon className={clsx(
-            item.isMain ? "w-6 h-6" : "w-5 h-5"
-          )} />
-        </NavLink>
-      ))}
+    <nav className="tabbar2 fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.05)] pb-[env(safe-area-inset-bottom)]">
+      <ul className="tabbar2-list flex h-16">
+        {NAV_ITEMS.map((item) => (
+          <li key={item.path} className="tabbar2-item">
+            <NavLink
+              to={item.path}
+              aria-label={item.label}
+              className={({ isActive }) => clsx('tabbar2-link', isActive && 'is-active')}
+            >
+              <item.icon className="tabbar2-icon" />
+            </NavLink>
+          </li>
+        ))}
+      </ul>
     </nav>
   );
 }

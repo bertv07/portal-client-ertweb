@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import axios from 'axios';
+import api from '../../lib/axios';
 
 // Helper to get correct icon and color based on notification type
 const getIconConfig = (type) => {
@@ -43,10 +43,11 @@ export default function Notifications() {
   const { data: notifs, isLoading, error } = useQuery({
     queryKey: ['notifications'],
     queryFn: async () => {
-      const response = await axios.get('http://localhost:8000/api/v1/notifications/');
+      const response = await api.get('/notifications/');
       return response.data;
     }
   });
+
 
   return (
     <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">

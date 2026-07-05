@@ -1,23 +1,109 @@
 @import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&family=JetBrains+Mono:wght@400;500&display=swap");
 
+/* Paleta e identidad tomadas de ertweb.com (portafolio) — mismo morado de marca,
+   mismo acento y misma tipografía, para que el portal se sienta parte de la
+   misma marca en vez de usar el violeta genérico de Tailwind. */
 @theme {
-  --color-brand-50: #f5f3ff;
-  --color-brand-100: #ede9fe;
-  --color-brand-200: #ddd6fe;
-  --color-brand-300: #c4b5fd;
-  --color-brand-400: #a78bfa;
-  --color-brand-500: #8b5cf6;
-  --color-brand-600: #7c3aed;
-  --color-brand-700: #6d28d9;
-  --color-brand-800: #5b21b6;
-  --color-brand-900: #4c1d95;
-  --color-brand-950: #2e1065;
+  --color-brand-50: #f6f2f9;
+  --color-brand-100: #ece2f1;
+  --color-brand-200: #d9c5e3;
+  --color-brand-300: #bb96cc;
+  --color-brand-400: #9563ac;
+  --color-brand-500: #7b3f96;
+  --color-brand-600: #57286d;
+  --color-brand-700: #451f57;
+  --color-brand-800: #341742;
+  --color-brand-900: #241030;
+  --color-brand-950: #150a1c;
 
-  --font-sans: "Inter", system-ui, sans-serif;
+  --color-accent-400: #c084fc;
+  --color-accent-500: #a855f7;
+  --color-accent-600: #9333ea;
+
+  --font-sans: "Montserrat", "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
 }
 
 @layer base {
   html, body {
-    @apply bg-brand-50 text-gray-900 antialiased min-h-screen;
+    @apply bg-brand-50 text-gray-900 antialiased min-h-screen overflow-x-hidden;
   }
+
+  /* Por defecto, un hijo de flex/grid no se encoge por debajo del ancho de su
+     contenido (min-width: auto), lo que empuja layouts completos fuera de
+     pantalla en mobile cuando hay texto largo. Este reset lo permite. */
+  * {
+    min-width: 0;
+  }
+}
+
+/* Bottom tab bar — burbuja con muescas laterales (basado en codespud tab-style2) */
+.tabbar2-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tabbar2-item {
+  flex: 1 1 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.tabbar2-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.5rem;
+  border-top-left-radius: 999px;
+  border-top-right-radius: 999px;
+  background: #fff;
+  color: #9ca3af;
+  transition: width 0.35s ease, height 0.35s ease, transform 0.35s ease,
+    color 0.35s ease, box-shadow 0.35s ease, border-radius 0.35s ease;
+}
+
+.tabbar2-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  transition: width 0.35s ease, height 0.35s ease;
+}
+
+.tabbar2-link.is-active {
+  z-index: 1;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 999px;
+  transform: translateY(-1.15rem);
+  color: #57286d;
+  box-shadow: 0 8px 20px rgba(87, 40, 109, 0.28), 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.tabbar2-link.is-active .tabbar2-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.tabbar2-link.is-active::before,
+.tabbar2-link.is-active::after {
+  content: "";
+  position: absolute;
+  bottom: 0.05rem;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-bottom: 0.3rem solid #fff;
+}
+
+.tabbar2-link.is-active::before {
+  left: -0.75rem;
+  border-bottom-right-radius: 999px;
+}
+
+.tabbar2-link.is-active::after {
+  right: -0.75rem;
+  border-bottom-left-radius: 999px;
 }
