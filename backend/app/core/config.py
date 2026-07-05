@@ -22,8 +22,9 @@ class Settings(BaseSettings):
 
     # CORS
     CORS_ORIGINS: list[str] = [
-        "http://localhost:5173",
-        "https://portal.ertweb.com",
+    "http://localhost:5173",
+    "https://portal.ertweb.com",
+    "https://www.portal.ertweb.com",
     ]
 
     # PayPal
