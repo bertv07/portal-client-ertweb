@@ -1,10 +1,13 @@
-import { Bell, User, LogOut } from 'lucide-react';
+import { useState } from 'react';
+import { Bell, User, LogOut, KeyRound } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router';
+import ChangePasswordModal from '../auth/ChangePasswordModal';
 
 export default function Header() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -34,7 +37,15 @@ export default function Header() {
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-brand-100"></span>
         </button>
 
-        <button 
+        <button
+          onClick={() => setShowChangePassword(true)}
+          className="relative p-2 text-brand-800 bg-white/30 hover:bg-white/50 rounded-full transition-colors"
+          title="Cambiar contraseña"
+        >
+          <KeyRound className="w-5 h-5" />
+        </button>
+
+        <button
           onClick={handleLogout}
           className="relative p-2 text-red-500 bg-white/30 hover:bg-white/50 rounded-full transition-colors"
           title="Cerrar sesión"
@@ -42,6 +53,10 @@ export default function Header() {
           <LogOut className="w-5 h-5" />
         </button>
       </div>
+
+      {showChangePassword && (
+        <ChangePasswordModal onClose={() => setShowChangePassword(false)} />
+      )}
     </header>
   );
 }

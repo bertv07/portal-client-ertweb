@@ -10,6 +10,7 @@
 |--------|----------|------|-------------|
 | POST | `/auth/login` | Público | Login. Body: `username=email&password=pass` (form-urlencoded) |
 | GET | `/auth/me` | Token | Datos del usuario logueado |
+| POST | `/auth/change-password` | Token | Cambia la contraseña propia. Body: `{current_password, new_password}`. Valida la actual; la nueva mínimo 6 caracteres. |
 
 ---
 
@@ -52,6 +53,7 @@
 | POST | `/invoices` | Admin | Crea factura. Body: `{client_id, project_id?, number, description?, amount, currency?, status?, due_date?}` |
 | PUT | `/invoices/{id}` | Admin | Actualiza factura. Body: `{status?, paid_at?, description?, amount?, due_date?}` |
 | POST | `/invoices/{id}/upload-pdf` | Admin | Adjunta PDF (multipart/form-data: `file`) |
+| POST | `/invoices/{id}/generate-pdf` | Admin o n8n | Genera el PDF del recibo desde la plantilla (`app/assets/plantilla_recibo.html`), lo guarda en `uploads/invoices/{number}.pdf` y lo asocia a la factura. Query params opcionales: `telefono`, `tipo_pago` (default `Anticipo 50%`). Devuelve `{"pdf_url": "<URL absoluta>"}`. |
 | DELETE | `/invoices/{id}` | Admin | Elimina factura |
 
 **Valores de `status`**: `pending`, `paid`, `overdue`, `cancelled`
@@ -84,7 +86,7 @@
 | GET | `/maintenance/me/payments` | Cliente | Historial de pagos del cliente |
 | GET | `/maintenance` | Admin | Todos los planes |
 | GET | `/maintenance/client/{client_id}` | Admin | Planes de un cliente específico |
-| POST | `/maintenance` | Admin | Crea plan. Body: `{client_id, plan_name, description?, price, currency?, billing_cycle?, start_date?, next_payment_date?, tasks_json?}` |
+| POST | `/maintenance` | Admin o n8n | Crea plan. Body: `{client_id, plan_name, description?, price, currency?, billing_cycle?, start_date?, next_payment_date?, tasks_json?}`. Acepta `X-N8N-API-Key` además del JWT de admin. |
 | PUT | `/maintenance/{id}` | Admin | Actualiza plan |
 | DELETE | `/maintenance/{id}` | Admin | Elimina plan |
 | POST | `/maintenance/{plan_id}/payments` | Admin | Agrega registro de pago. Body: `{plan_id, amount, currency?, due_date?, notes?}` |
@@ -92,6 +94,16 @@
 
 **`tasks_json`**: JSON string con array de strings: `'["Software Update", "Security Audit"]'`
 **Valores de `billing_cycle`**: `monthly`, `annual`
+
+---
+
+## 📜 Terms (Términos y Condiciones)
+
+| Method | Endpoint | Auth | Descripción |
+|--------|----------|------|-------------|
+| POST | `/terms/generate-pdf` | Admin o n8n | Genera el PDF de Términos y Condiciones desde `app/assets/plantilla_terminos.html`. Body: `{cliente_nombre, proyecto_nombre, client_id?}`. Se guarda en `uploads/documents/terminos_{slug}_{fecha}.pdf`. Si viene `client_id`, queda registrado como documento del cliente (doc_type `terminos`, status `approved`) visible en su portal. Devuelve `{"pdf_url": "<URL absoluta>"}`. |
+
+Las URLs absolutas se construyen con `BACKEND_BASE_URL` del `.env` — en producción debe ser `https://api.ertweb.com`.
 
 ---
 
@@ -103,6 +115,22 @@
 | POST | `/notifications/send` | Admin | Envía notificación. Body: `{user_id, title, message, type, subtitle?, action_text?}` |
 
 **Valores de `type`**: `milestone`, `document`, `support`, `update`
+
+---
+
+## 📅 Appointments (Citas)
+
+| Method | Endpoint | Auth | Descripción |
+|--------|----------|------|-------------|
+| GET | `/appointments/me` | Cliente | Citas del cliente logueado |
+| GET | `/appointments` | Admin | Todas las citas |
+| GET | `/appointments/client/{client_id}` | Admin | Citas de un cliente específico |
+| POST | `/appointments` | Admin o n8n | Crea una cita. Acepta `X-N8N-API-Key` además del JWT de admin. |
+| PUT | `/appointments/{id}` | Admin | Actualiza una cita. Body: `{title?, description?, appointment_date?, time_slot?, duration_minutes?, status?, meeting_link?, notes?}` |
+| DELETE | `/appointments/{id}` | Admin | Elimina una cita |
+
+**Valores de `status`**: `scheduled`, `completed`, `cancelled`, `no_show`
+**Valores de `source`**: `client`, `admin`, `n8n`
 
 ---
 

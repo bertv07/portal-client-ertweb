@@ -13,6 +13,7 @@ const pageTitles = {
   '/admin/invoices': { title: 'Facturación', subtitle: 'Facturas y comprobantes de pago' },
   '/admin/documents': { title: 'Documentos', subtitle: 'Archivos subidos por los clientes' },
   '/admin/maintenance': { title: 'Mantenimiento', subtitle: 'Planes de mantenimiento y pagos' },
+  '/admin/appointments': { title: 'Citas', subtitle: 'Gestión de citas y reuniones' },
   '/admin/notifications': { title: 'Notificaciones', subtitle: 'Enviar notificaciones a clientes' },
 };
 

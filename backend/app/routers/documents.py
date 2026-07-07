@@ -9,7 +9,7 @@ from typing import List, Optional
 from app.core.database import get_db
 from app.models.document import Document
 from app.schemas.document import DocumentResponse, DocumentStatusUpdate, DocumentRequiredCreate
-from app.api.deps import get_current_user, get_current_admin_user
+from app.api.deps import get_current_user, get_current_admin_user, require_admin_or_n8n
 from app.models.user import User
 
 UPLOAD_DIR = Path("uploads/documents")
@@ -47,7 +47,7 @@ async def get_all_documents(
 async def get_client_documents(
     client_id: str,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(get_current_admin_user),
+    caller: str = Depends(require_admin_or_n8n),
 ):
     """Admin: get documents for a specific client."""
     stmt = select(Document).where(Document.client_id == client_id).order_by(Document.created_at.desc())
@@ -59,7 +59,7 @@ async def get_client_documents(
 async def create_required_document_slot(
     doc_in: DocumentRequiredCreate,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(get_current_admin_user),
+    caller: str = Depends(require_admin_or_n8n),
 ):
     """Admin: create a 'required' document placeholder that client must fill."""
     doc = Document(

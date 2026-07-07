@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { motion } from 'motion/react';
 import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import ertLogoWhite from '../../assets/ert-logo-white.png';
 
 const EASE_OUT = [0.16, 1, 0.3, 1]; // expo.out
 
@@ -75,9 +76,7 @@ export default function Login() {
       >
         {/* Marca */}
         <motion.div variants={item} className="flex flex-col items-center mb-8 text-center">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center shadow-lg shadow-brand-600/30 mb-4">
-            <span className="text-white font-black text-lg">E</span>
-          </div>
+          <img src={ertLogoWhite} alt="ertweb" className="h-10 w-auto mb-5" />
           <h1 className="text-2xl font-extrabold text-white tracking-tight">Portal de Clientes</h1>
           <p className="mt-1.5 text-sm text-white/40">Diseño que piensa. Código que siente.</p>
         </motion.div>

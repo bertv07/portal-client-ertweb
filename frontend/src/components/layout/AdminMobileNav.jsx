@@ -1,10 +1,11 @@
 import { NavLink, useNavigate } from 'react-router';
 import { AnimatePresence, motion } from 'motion/react';
 import {
-  LayoutDashboard, Users, FolderOpen, Wallet, Wrench, Bell, LogOut, X,
+  LayoutDashboard, Users, FolderOpen, Wallet, Wrench, Bell, LogOut, X, CalendarCheck,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../../context/AuthContext';
+import ertLogoWhite from '../../assets/ert-logo-white.png';
 
 const navItems = [
   { path: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -14,6 +15,7 @@ const navItems = [
   { path: '/admin/documents', icon: FolderOpen, label: 'Documentos' },
   { path: '/admin/maintenance', icon: Wrench, label: 'Mantenimiento' },
   { path: '/admin/payments', icon: Wallet, label: 'Pagos Manuales' },
+  { path: '/admin/appointments', icon: CalendarCheck, label: 'Citas' },
   { path: '/admin/notifications', icon: Bell, label: 'Notificaciones' },
 ];
 
@@ -52,14 +54,9 @@ export default function AdminMobileNav({ open, onClose }) {
             className="fixed top-0 right-0 bottom-0 w-[80%] max-w-xs bg-[#0d0d0d] z-[70] flex flex-col lg:hidden"
           >
             <div className="flex items-center justify-between px-5 py-6 border-b border-white/5">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center shadow-lg shadow-brand-500/30">
-                  <span className="text-white font-black text-sm">E</span>
-                </div>
-                <div>
-                  <div className="font-bold text-white text-sm leading-tight">ErtWeb</div>
-                  <div className="text-[10px] text-brand-400 font-medium">Panel Admin</div>
-                </div>
+              <div className="flex flex-col">
+                <img src={ertLogoWhite} alt="ertweb" className="h-6 w-auto self-start" />
+                <div className="mt-1.5 text-[10px] text-brand-400 font-medium tracking-wide">Panel Admin</div>
               </div>
               <button
                 onClick={onClose}

@@ -24,7 +24,7 @@ class UserUpdate(BaseModel):
 @router.get("/", response_model=List[UserResponse])
 async def get_all_clients(
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(get_current_admin_user),
+    caller: str = Depends(require_admin_or_n8n),
 ):
     """Admin: list all client users."""
     stmt = select(User).where(User.role == "client").order_by(User.created_at.desc())

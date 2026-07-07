@@ -6,7 +6,7 @@ from typing import List
 from app.core.database import get_db
 from app.models.project import Project
 from app.schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse
-from app.api.deps import get_current_user, get_current_admin_user
+from app.api.deps import get_current_user, get_current_admin_user, require_admin_or_n8n
 from app.models.user import User
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -38,7 +38,7 @@ async def get_all_projects(
 async def get_client_projects(
     client_id: str,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(get_current_admin_user),
+    caller: str = Depends(require_admin_or_n8n),
 ):
     """Admin: get all projects for a specific client."""
     stmt = select(Project).where(Project.client_id == client_id).order_by(Project.created_at.desc())
@@ -50,7 +50,7 @@ async def get_client_projects(
 async def create_project(
     project_in: ProjectCreate,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(get_current_admin_user),
+    caller: str = Depends(require_admin_or_n8n),
 ):
     """Admin: create a new project for a client."""
     project = Project(**project_in.model_dump())

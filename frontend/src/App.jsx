@@ -27,6 +27,7 @@ import AdminDocuments from './pages/admin/AdminDocuments';
 import AdminMaintenance from './pages/admin/AdminMaintenance';
 import AdminNotifications from './pages/admin/AdminNotifications';
 import AdminPayments from './pages/admin/AdminPayments';
+import AdminAppointments from './pages/admin/AdminAppointments';
 
 function App() {
   return (
@@ -61,6 +62,7 @@ function App() {
                 <Route path="documents" element={<AdminDocuments />} />
                 <Route path="maintenance" element={<AdminMaintenance />} />
                 <Route path="payments" element={<AdminPayments />} />
+                <Route path="appointments" element={<AdminAppointments />} />
                 <Route path="notifications" element={<AdminNotifications />} />
               </Route>
             </Route>

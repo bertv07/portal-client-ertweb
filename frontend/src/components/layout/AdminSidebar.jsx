@@ -1,10 +1,11 @@
 import { NavLink, useNavigate } from 'react-router';
 import {
   LayoutDashboard, Users, FolderOpen, Wallet, Wrench, Bell, LogOut,
-  ChevronRight, Settings
+  ChevronRight, Settings, CalendarCheck
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../../context/AuthContext';
+import ertLogoWhite from '../../assets/ert-logo-white.png';
 
 const navItems = [
   { path: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -14,6 +15,7 @@ const navItems = [
   { path: '/admin/documents', icon: FolderOpen, label: 'Documentos' },
   { path: '/admin/maintenance', icon: Wrench, label: 'Mantenimiento' },
   { path: '/admin/payments', icon: Wallet, label: 'Pagos Manuales' },
+  { path: '/admin/appointments', icon: CalendarCheck, label: 'Citas' },
   { path: '/admin/notifications', icon: Bell, label: 'Notificaciones' },
 ];
 
@@ -30,15 +32,8 @@ export default function AdminSidebar() {
     <aside className="hidden lg:flex flex-col w-64 min-h-screen bg-gray-950 fixed left-0 top-0 bottom-0 z-40">
       {/* Logo */}
       <div className="px-6 py-7 border-b border-white/5">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center shadow-lg shadow-brand-500/30">
-            <span className="text-white font-black text-sm">E</span>
-          </div>
-          <div>
-            <div className="font-bold text-white text-sm leading-tight">ErtWeb</div>
-            <div className="text-[10px] text-brand-400 font-medium">Panel Admin</div>
-          </div>
-        </div>
+        <img src={ertLogoWhite} alt="ertweb" className="h-7 w-auto" />
+        <div className="mt-2 text-[10px] text-brand-400 font-medium tracking-wide">Panel Admin</div>
       </div>
 
       {/* Admin info */}

@@ -11,7 +11,7 @@ from app.schemas.maintenance import (
     MaintenancePlanCreate, MaintenancePlanUpdate, MaintenancePlanResponse,
     MaintenancePaymentCreate, MaintenancePaymentResponse,
 )
-from app.api.deps import get_current_user, get_current_admin_user
+from app.api.deps import get_current_user, get_current_admin_user, require_admin_or_n8n
 from app.models.user import User
 
 router = APIRouter(prefix="/maintenance", tags=["maintenance"])
@@ -113,7 +113,7 @@ async def get_all_plans(
 async def get_client_plans(
     client_id: str,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(get_current_admin_user),
+    caller: str = Depends(require_admin_or_n8n),
 ):
     """Admin: get maintenance plans of a specific client."""
     stmt = select(MaintenancePlan).where(MaintenancePlan.client_id == client_id).order_by(MaintenancePlan.created_at.desc())
@@ -125,9 +125,9 @@ async def get_client_plans(
 async def create_plan(
     plan_in: MaintenancePlanCreate,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(get_current_admin_user),
+    caller: str = Depends(require_admin_or_n8n),
 ):
-    """Admin: create a maintenance plan for a client."""
+    """Create a maintenance plan for a client. Accepts admin JWT or X-N8N-API-Key."""
     plan = MaintenancePlan(**plan_in.model_dump())
     db.add(plan)
     await db.commit()

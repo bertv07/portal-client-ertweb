@@ -2,6 +2,7 @@ import { NavLink, useNavigate } from 'react-router';
 import { Home, FolderOpen, Wallet, Calendar, Settings, Bell, LogOut, User, ChevronRight } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../../context/AuthContext';
+import ertLogo from '../../assets/ert-logo.png';
 
 const navItems = [
   { path: '/dashboard', icon: Home, label: 'Dashboard' },
@@ -25,15 +26,8 @@ export default function Sidebar() {
     <aside className="hidden lg:flex flex-col w-64 min-h-screen bg-white border-r border-gray-100 fixed left-0 top-0 bottom-0 z-40 shadow-sm">
       {/* Logo */}
       <div className="px-6 py-7 border-b border-gray-50">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center shadow-md shadow-brand-500/30">
-            <span className="text-white font-black text-sm">E</span>
-          </div>
-          <div>
-            <div className="font-bold text-gray-900 text-sm leading-tight">ErtWeb</div>
-            <div className="text-[10px] text-brand-600 font-medium">Portal de Clientes</div>
-          </div>
-        </div>
+        <img src={ertLogo} alt="ertweb" className="h-7 w-auto" />
+        <div className="mt-2 text-[10px] text-brand-600 font-medium tracking-wide">Portal de Clientes</div>
       </div>
 
       {/* User Info */}

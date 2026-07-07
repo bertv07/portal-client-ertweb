@@ -1,17 +1,23 @@
 import os
+import re
 import uuid
 import shutil
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from starlette.concurrency import run_in_threadpool
 from typing import List, Optional
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.models.invoice import Invoice
+from app.models.project import Project
 from app.schemas.invoice import InvoiceCreate, InvoiceUpdate, InvoiceResponse
-from app.api.deps import get_current_user, get_current_admin_user
+from app.api.deps import get_current_user, get_current_admin_user, require_admin_or_n8n
 from app.models.user import User
+from app.services.pdf import render_pdf
 
 UPLOAD_DIR = Path("uploads/invoices")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -45,7 +51,7 @@ async def get_all_invoices(
 async def get_client_invoices(
     client_id: str,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(get_current_admin_user),
+    caller: str = Depends(require_admin_or_n8n),
 ):
     """Admin: get all invoices for a specific client."""
     stmt = select(Invoice).where(Invoice.client_id == client_id).order_by(Invoice.created_at.desc())
@@ -57,7 +63,7 @@ async def get_client_invoices(
 async def create_invoice(
     invoice_in: InvoiceCreate,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(get_current_admin_user),
+    caller: str = Depends(require_admin_or_n8n),
 ):
     """Admin: create a new invoice."""
     invoice = Invoice(**invoice_in.model_dump())
@@ -92,6 +98,67 @@ async def upload_invoice_pdf(
     await db.commit()
     await db.refresh(invoice)
     return invoice
+
+
+@router.post("/{invoice_id}/generate-pdf")
+async def generate_invoice_pdf(
+    invoice_id: str,
+    telefono: Optional[str] = None,
+    tipo_pago: str = "Anticipo 50%",
+    db: AsyncSession = Depends(get_db),
+    caller: str = Depends(require_admin_or_n8n),
+):
+    """Genera el PDF del recibo desde la plantilla y lo asocia a la factura.
+
+    Acepta admin JWT o X-N8N-API-Key. Query params opcionales:
+      - telefono: teléfono del cliente que se muestra en el recibo
+      - tipo_pago: etiqueta del concepto (default "Anticipo 50%")
+    Devuelve {"pdf_url": "<URL absoluta>"} lista para enviar por WhatsApp.
+    """
+    stmt = select(Invoice).where(Invoice.id == invoice_id)
+    result = await db.execute(stmt)
+    invoice = result.scalar_one_or_none()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    res_client = await db.execute(select(User).where(User.id == invoice.client_id))
+    client = res_client.scalar_one_or_none()
+
+    proyecto_nombre = invoice.description or "Proyecto"
+    if invoice.project_id:
+        res_proj = await db.execute(select(Project).where(Project.id == invoice.project_id))
+        project = res_proj.scalar_one_or_none()
+        if project:
+            proyecto_nombre = project.name
+
+    estados = {"pending": "PENDIENTE", "paid": "PAGADO", "overdue": "VENCIDO", "cancelled": "ANULADO"}
+    hoy = datetime.now(timezone(timedelta(hours=-4)))  # hora de Venezuela (UTC-4, sin DST)
+
+    context = {
+        "numero": invoice.number,
+        "fecha_emision": hoy.strftime("%d/%m/%Y"),
+        "fecha_vencimiento": invoice.due_date.strftime("%d/%m/%Y") if invoice.due_date else "Contra entrega",
+        "estado": estados.get(invoice.status, invoice.status.upper()),
+        "cliente_nombre": client.name if client else "",
+        "cliente_email": client.email if client else "",
+        "cliente_telefono": telefono or "",
+        "proyecto_nombre": proyecto_nombre,
+        "tipo_pago": tipo_pago,
+        "descripcion": invoice.description or "",
+        "monto": f"{invoice.amount:,.2f}",
+        "moneda": invoice.currency,
+    }
+
+    pdf_bytes = await run_in_threadpool(render_pdf, "plantilla_recibo.html", context)
+
+    safe_number = re.sub(r"[^A-Za-z0-9._-]", "_", invoice.number)
+    filename = f"{safe_number}.pdf"
+    (UPLOAD_DIR / filename).write_bytes(pdf_bytes)
+
+    invoice.pdf_url = f"/uploads/invoices/{filename}"
+    await db.commit()
+
+    return {"pdf_url": f"{settings.BACKEND_BASE_URL}/uploads/invoices/{filename}"}
 
 
 @router.put("/{invoice_id}", response_model=InvoiceResponse)

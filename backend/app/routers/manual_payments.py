@@ -203,7 +203,7 @@ async def get_my_manual_payments(
 async def get_client_manual_payments(
     client_id: str,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(get_current_admin_user),
+    caller: str = Depends(require_admin_or_n8n),
 ):
     """Admin: lista los pagos manuales de un cliente específico."""
     stmt = (

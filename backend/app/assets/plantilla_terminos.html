@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page { size: A4; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Helvetica, Arial, sans-serif; color: #2b2b33; font-size: 10pt; }
+
+  .banda { background: #57286D; height: 14px; }
+  .contenido { padding: 30px 48px 60px 48px; }
+
+  .cabecera { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+  .cabecera td { vertical-align: middle; }
+  .logo { height: 48px; }
+  .titulo { text-align: right; }
+  .titulo h1 { color: #57286D; font-size: 16pt; font-weight: 800; letter-spacing: 1px; }
+  .titulo p { color: #6b6b76; font-size: 9pt; margin-top: 4px; }
+
+  .intro { background: #F5F0FA; border-radius: 8px; padding: 14px 18px; font-size: 9.5pt; line-height: 1.6; margin-bottom: 20px; }
+  .intro b { color: #57286D; }
+
+  h2 { color: #57286D; font-size: 10.5pt; text-transform: uppercase; letter-spacing: 1px; margin: 16px 0 6px 0; }
+  p, li { line-height: 1.6; font-size: 9.5pt; }
+  ul { padding-left: 18px; margin: 4px 0; }
+
+  .firma { margin-top: 26px; border-top: 1px solid #E8E1F0; padding-top: 14px; font-size: 9pt; color: #6b6b76; line-height: 1.6; }
+
+  .pie { position: fixed; bottom: 0; left: 0; right: 0; }
+  .pie .linea { background: #57286D; padding: 10px 48px; color: #ffffff; font-size: 8pt; text-align: center; letter-spacing: .5px; }
+</style>
+</head>
+<body>
+
+<div class="banda"></div>
+
+<div class="contenido">
+
+  <table class="cabecera">
+    <tr>
+      <td><img src="{{ logo_src }}" class="logo" alt="ertweb"></td>
+      <td class="titulo">
+        <h1>TÉRMINOS Y CONDICIONES DE SERVICIO</h1>
+        <p>Versión {{ version }} · Emitido el {{ fecha }}</p>
+      </td>
+    </tr>
+  </table>
+
+  <div class="intro">
+    Estos términos aplican al servicio contratado por <b>{{ cliente_nombre }}</b> para el proyecto <b>{{ proyecto_nombre }}</b> con ERTWeb, servicio independiente de desarrollo web y automatizaciones con sede en Caracas, Venezuela. La aceptación de la cotización y/o el pago del anticipo implica la aceptación de estos términos.
+  </div>
+
+  <h2>1. Objeto del servicio</h2>
+  <p>ERTWeb desarrollará el proyecto descrito en la cotización aceptada por el cliente. Cualquier funcionalidad no incluida expresamente en la cotización se considera fuera de alcance y se cotiza por separado.</p>
+
+  <h2>2. Forma de pago</h2>
+  <ul>
+    <li>Los proyectos se trabajan con un <b>anticipo del 50%</b> para iniciar y el <b>50% restante contra entrega</b>, antes de la publicación final o transferencia de accesos.</li>
+    <li>Los pagos se realizan en dólares estadounidenses (USD) por Binance Pay o PayPal a través del portal de clientes.</li>
+    <li><b>El anticipo no es reembolsable</b> una vez iniciado el trabajo, ya que cubre horas de diseño y desarrollo ya ejecutadas.</li>
+  </ul>
+
+  <h2>3. Plazos de entrega</h2>
+  <p>El plazo estimado se indica en la cotización y comienza a contar desde la recepción del anticipo y de los materiales del cliente (punto 4). Los retrasos del cliente en entregar materiales o aprobaciones extienden el plazo en la misma proporción y no constituyen incumplimiento de ERTWeb.</p>
+
+  <h2>4. Materiales y responsabilidades del cliente</h2>
+  <p>El cliente se compromete a entregar oportunamente a través del portal: logo o material de marca, contenidos y textos del sitio, y referencias de diseño. El cliente garantiza que posee los derechos de uso de todo material que entregue (imágenes, textos, marcas).</p>
+
+  <h2>5. Revisiones de diseño</h2>
+  <p>El proyecto incluye hasta <b>3 rondas de revisiones de diseño</b>. Revisiones adicionales, cambios de alcance o rediseños posteriores a la aprobación se cotizan por separado como horas adicionales.</p>
+
+  <h2>6. Hosting y dominio</h2>
+  <p>El hosting y el dominio <b>corren siempre por cuenta del cliente</b>, quien es su titular y responsable de su renovación. ERTWeb puede asesorar en la contratación y realizar la configuración inicial. Si el cliente contrata un plan de mantenimiento mensual, la gestión técnica queda cubierta según lo indicado en ese plan.</p>
+
+  <h2>7. Soporte posterior a la entrega</h2>
+  <p>La entrega incluye <b>30 días de soporte gratuito</b> para corrección de errores atribuibles al desarrollo. No incluye nuevas funcionalidades, cambios de contenido ni problemas causados por terceros (hosting, plugins externos, modificaciones del cliente). Pasado ese período, el soporte se presta mediante plan de mantenimiento o cotización puntual.</p>
+
+  <h2>8. Propiedad intelectual</h2>
+  <p>Al completarse el pago total del proyecto, el cliente adquiere los derechos de uso sobre el sitio, diseño y desarrollos entregados. ERTWeb conserva el derecho de mostrar el trabajo en su portafolio y materiales promocionales, salvo acuerdo escrito en contrario. Hasta que no se complete el pago total, todo el trabajo es propiedad de ERTWeb.</p>
+
+  <h2>9. Automatizaciones y servicios de terceros</h2>
+  <p>Las automatizaciones pueden depender de servicios de terceros (WhatsApp, Meta, Google, pasarelas de pago, servidores). ERTWeb no es responsable por cambios, límites o interrupciones de dichos servicios, aunque asistirá al cliente en adaptar la solución cuando sea posible.</p>
+
+  <h2>10. Cancelación</h2>
+  <p>Si el cliente cancela el proyecto después de iniciado, el anticipo no se reembolsa. Si la cancelación ocurre con más del 50% del trabajo ejecutado, ERTWeb podrá facturar la proporción adicional del avance. ERTWeb podrá suspender el servicio ante falta de pago o de respuesta del cliente por más de 30 días.</p>
+
+  <h2>11. Comunicación</h2>
+  <p>El canal oficial de comunicación y seguimiento es WhatsApp y el portal de clientes portal.ertweb.com, donde el cliente puede ver el avance del proyecto, sus recibos, documentos y citas.</p>
+
+  <h2>12. Limitación de responsabilidad</h2>
+  <p>La responsabilidad total de ERTWeb frente al cliente se limita al monto efectivamente pagado por el proyecto. ERTWeb no responde por lucro cesante, pérdida de datos causada por terceros ni daños indirectos.</p>
+
+  <div class="firma">
+    Documento generado automáticamente por ERTWeb para {{ cliente_nombre }} el {{ fecha }}. La aceptación de la cotización, el pago del anticipo o la respuesta afirmativa por WhatsApp constituyen aceptación plena de estos términos, sin necesidad de firma manuscrita.
+  </div>
+
+</div>
+
+<div class="pie">
+  <div class="linea">ERTWeb · Caracas, Venezuela · ertwebdev@gmail.com · +58 412-0474159 · portal.ertweb.com</div>
+</div>
+
+</body>
+</html>

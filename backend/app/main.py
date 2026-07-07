@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
-from app.routers import notifications, auth, projects, invoices, documents, users, maintenance, meetings, payments, manual_payments
+from app.routers import notifications, auth, projects, invoices, documents, users, maintenance, meetings, payments, manual_payments, appointments, terms
 
 from sqlalchemy import select
 from app.core.database import SessionLocal
@@ -48,6 +48,8 @@ app.include_router(maintenance.router, prefix=settings.API_V1_STR)
 app.include_router(meetings.router, prefix=settings.API_V1_STR)
 app.include_router(payments.router, prefix=settings.API_V1_STR)
 app.include_router(manual_payments.router, prefix=settings.API_V1_STR)
+app.include_router(appointments.router, prefix=settings.API_V1_STR)
+app.include_router(terms.router, prefix=settings.API_V1_STR)
 
 
 
