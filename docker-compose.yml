@@ -28,6 +28,9 @@ services:
       - ./backend/.env
     environment:
       DATABASE_URL: postgresql+asyncpg://ertweb_user:ertweb_password@db:5432/ertweb_db
+    volumes:
+      # Documentos, facturas y comprobantes: sin este volumen se pierden en cada rebuild
+      - uploads_data:/app/uploads
     networks:
       - easypanel
     labels:
@@ -60,6 +63,7 @@ services:
 
 volumes:
   postgres_data:
+  uploads_data:
 
 networks:
   easypanel:

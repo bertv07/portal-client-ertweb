@@ -2,11 +2,12 @@ import json
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, update, delete
 from typing import List
 
 from app.core.database import get_db
 from app.models.maintenance import MaintenancePlan, MaintenancePayment
+from app.models.manual_payment import ManualPayment
 from app.schemas.maintenance import (
     MaintenancePlanCreate, MaintenancePlanUpdate, MaintenancePlanResponse,
     MaintenancePaymentCreate, MaintenancePaymentResponse,
@@ -51,51 +52,6 @@ async def get_my_maintenance_payments(
     return result.scalars().all()
 
 
-@router.post("/{plan_id}/pay", response_model=MaintenancePlanResponse)
-async def pay_maintenance_plan(
-    plan_id: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Client: simulate payment on a plan, updating next payment date and logging a payment record."""
-    stmt = select(MaintenancePlan).where(MaintenancePlan.id == plan_id)
-    result = await db.execute(stmt)
-    plan = result.scalar_one_or_none()
-    if not plan:
-        raise HTTPException(status_code=404, detail="Plan not found")
-
-    if plan.client_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized")
-
-    from datetime import datetime, timedelta, timezone
-    # Add billing cycle duration
-    today = datetime.now(timezone.utc).date()
-    current_due = plan.next_payment_date or today
-    
-    if plan.billing_cycle == "annual":
-        new_due = current_due + timedelta(days=365)
-    else:
-        new_due = current_due + timedelta(days=30)
-        
-    plan.next_payment_date = new_due
-    
-    # Log the payment record
-    payment = MaintenancePayment(
-        plan_id=plan.id,
-        amount=plan.price,
-        currency=plan.currency,
-        due_date=current_due,
-        paid_at=datetime.now(timezone.utc),
-        status="paid",
-        notes=f"Pago online simulado ({plan.billing_cycle})"
-    )
-    db.add(payment)
-    await db.commit()
-    await db.refresh(plan)
-    return plan
-
-
-
 # ─── Admin endpoints ──────────────────────────────────────────────────────────
 
 @router.get("/", response_model=List[MaintenancePlanResponse])
@@ -128,6 +84,8 @@ async def create_plan(
     caller: str = Depends(require_admin_or_n8n),
 ):
     """Create a maintenance plan for a client. Accepts admin JWT or X-N8N-API-Key."""
+    if not await db.get(User, plan_in.client_id):
+        raise HTTPException(status_code=404, detail="Client not found")
     plan = MaintenancePlan(**plan_in.model_dump())
     db.add(plan)
     await db.commit()
@@ -169,11 +127,25 @@ async def delete_plan(
     plan = result.scalar_one_or_none()
     if not plan:
         raise HTTPException(status_code=404, detail="Plan not found")
+    await db.execute(update(ManualPayment).where(ManualPayment.plan_id == plan_id).values(plan_id=None))
+    await db.execute(delete(MaintenancePayment).where(MaintenancePayment.plan_id == plan_id))
     await db.delete(plan)
     await db.commit()
 
 
 # ─── Payment records ──────────────────────────────────────────────────────────
+
+@router.get("/{plan_id}/payments", response_model=List[MaintenancePaymentResponse])
+async def get_plan_payments(
+    plan_id: str,
+    db: AsyncSession = Depends(get_db),
+    caller: str = Depends(require_admin_or_n8n),
+):
+    """Admin / n8n: historial de pagos de un plan."""
+    stmt = select(MaintenancePayment).where(MaintenancePayment.plan_id == plan_id).order_by(MaintenancePayment.due_date.desc())
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
 
 @router.post("/{plan_id}/payments", response_model=MaintenancePaymentResponse, status_code=status.HTTP_201_CREATED)
 async def create_payment_record(
@@ -183,6 +155,8 @@ async def create_payment_record(
     admin: User = Depends(get_current_admin_user),
 ):
     """Admin: add a payment record to a plan."""
+    if not await db.get(MaintenancePlan, plan_id):
+        raise HTTPException(status_code=404, detail="Plan not found")
     payment_in.plan_id = plan_id
     payment = MaintenancePayment(**payment_in.model_dump())
     db.add(payment)

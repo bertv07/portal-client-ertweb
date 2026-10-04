@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import api from '../lib/axios';
 
 const AuthContext = createContext(null);
@@ -6,6 +7,7 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     // Check if user is logged in on mount
@@ -15,7 +17,7 @@ export function AuthProvider({ children }) {
         try {
           const response = await api.get('/auth/me');
           setUser(response.data);
-        } catch (error) {
+        } catch {
           localStorage.removeItem('token');
         }
       }
@@ -36,6 +38,8 @@ export function AuthProvider({ children }) {
     });
 
     const { access_token } = response.data;
+    // Nada de la sesión anterior debe quedar en caché para el usuario que entra
+    queryClient.clear();
     localStorage.setItem('token', access_token);
     
     // Fetch user details
@@ -46,6 +50,7 @@ export function AuthProvider({ children }) {
 
   const logout = () => {
     localStorage.removeItem('token');
+    queryClient.clear();
     setUser(null);
   };
 
@@ -56,6 +61,7 @@ export function AuthProvider({ children }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {

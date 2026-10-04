@@ -23,7 +23,9 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    // Sesión expirada o cuenta desactivada: se limpia el token y se vuelve al login
+    const isLoginCall = error.config?.url?.includes('/auth/login');
+    if (error.response?.status === 401 && !isLoginCall && window.location.pathname !== '/login') {
       localStorage.removeItem('token');
       window.location.href = '/login';
     }

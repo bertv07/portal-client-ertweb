@@ -11,6 +11,7 @@ from app.models.document import Document
 from app.schemas.document import DocumentResponse, DocumentStatusUpdate, DocumentRequiredCreate
 from app.api.deps import get_current_user, get_current_admin_user, require_admin_or_n8n
 from app.models.user import User
+from app.services.notify import add_notification
 
 UPLOAD_DIR = Path("uploads/documents")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -62,6 +63,12 @@ async def create_required_document_slot(
     caller: str = Depends(require_admin_or_n8n),
 ):
     """Admin: create a 'required' document placeholder that client must fill."""
+    if not await db.get(User, doc_in.client_id):
+        raise HTTPException(status_code=404, detail="Client not found")
+    add_notification(
+        db, doc_in.client_id, "Documento requerido",
+        f"Necesitamos que subas: {doc_in.name}.", type="document", 
+    )
     doc = Document(
         client_id=doc_in.client_id,
         project_id=doc_in.project_id,
@@ -152,6 +159,12 @@ async def upload_file_to_slot(
     with open(file_path, "wb") as f:
         f.write(content)
 
+    if doc.status == "approved":
+        raise HTTPException(status_code=400, detail="Este documento ya fue aprobado")
+    if doc.file_url:
+        Path(doc.file_url.lstrip("/")).unlink(missing_ok=True)
+
+    doc.admin_notes = None
     doc.original_filename = file.filename
     doc.file_url = f"/uploads/documents/{unique_name}"
     doc.file_type = ext.lstrip(".")
@@ -178,8 +191,17 @@ async def update_document_status(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
+    if not doc.file_url:
+        raise HTTPException(status_code=400, detail="El cliente todavía no ha subido este documento")
     doc.status = status_in.status
     doc.admin_notes = status_in.admin_notes
+    if status_in.status == "approved":
+        add_notification(db, doc.client_id, "Documento aprobado", f"«{doc.name}» fue aprobado.", type="document")
+    elif status_in.status == "rejected":
+        add_notification(
+            db, doc.client_id, "Documento rechazado",
+            f"«{doc.name}» fue rechazado. {status_in.admin_notes or 'Vuelve a subirlo, por favor.'}", type="document",
+        )
     await db.commit()
     await db.refresh(doc)
     return doc
@@ -201,6 +223,9 @@ async def delete_document(
     # Only owner or admin can delete
     if doc.client_id != current_user.id and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Not authorized")
+    # Un cliente no puede borrar lo que ya fue aprobado (contratos, términos...)
+    if current_user.role != "admin" and doc.status == "approved":
+        raise HTTPException(status_code=400, detail="Un documento aprobado no se puede eliminar")
 
     # Remove physical file if exists
     if doc.file_url:

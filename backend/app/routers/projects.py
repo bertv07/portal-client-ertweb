@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from datetime import datetime, timezone
+from sqlalchemy import select, update
 from typing import List
 
 from app.core.database import get_db
@@ -8,6 +9,9 @@ from app.models.project import Project
 from app.schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse
 from app.api.deps import get_current_user, get_current_admin_user, require_admin_or_n8n
 from app.models.user import User
+from app.models.invoice import Invoice
+from app.models.document import Document
+from app.services.notify import add_notification
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -53,8 +57,16 @@ async def create_project(
     caller: str = Depends(require_admin_or_n8n),
 ):
     """Admin: create a new project for a client."""
+    if not await db.get(User, project_in.client_id):
+        raise HTTPException(status_code=404, detail="Client not found")
     project = Project(**project_in.model_dump())
+    if not project.started_at:
+        project.started_at = datetime.now(timezone.utc)
     db.add(project)
+    add_notification(
+        db, project.client_id, "Proyecto creado", f"Ya puedes seguir el avance de «{project.name}» desde tu portal.",
+        type="milestone",
+    )
     await db.commit()
     await db.refresh(project)
     return project
@@ -65,18 +77,33 @@ async def update_project(
     project_id: str,
     project_in: ProjectUpdate,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(get_current_admin_user),
+    caller: str = Depends(require_admin_or_n8n),
 ):
-    """Admin: update a project."""
+    """Admin / n8n: update a project."""
     stmt = select(Project).where(Project.id == project_id)
     result = await db.execute(stmt)
     project = result.scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
+    old_phase, old_status = project.phase, project.status
     update_data = project_in.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(project, key, value)
+
+    if project.status == "completed" and not project.completed_at:
+        project.completed_at = datetime.now(timezone.utc)
+    elif project.status != "completed":
+        project.completed_at = None
+
+    # El cliente se entera cuando el proyecto cambia de fase o se entrega
+    if project.status == "completed" and old_status != "completed":
+        add_notification(db, project.client_id, "Proyecto entregado", f"«{project.name}» fue marcado como completado.", type="milestone")
+    elif project.phase != old_phase:
+        add_notification(
+            db, project.client_id, "Tu proyecto avanzó", f"«{project.name}» pasó a la fase {project.phase} ({project.progress_pct}%).",
+            type="milestone", subtitle=project.phase,
+        )
 
     await db.commit()
     await db.refresh(project)
@@ -95,5 +122,8 @@ async def delete_project(
     project = result.scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+    # Facturas y documentos del proyecto se conservan, solo se desvinculan
+    await db.execute(update(Invoice).where(Invoice.project_id == project_id).values(project_id=None))
+    await db.execute(update(Document).where(Document.project_id == project_id).values(project_id=None))
     await db.delete(project)
     await db.commit()

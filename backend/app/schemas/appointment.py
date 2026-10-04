@@ -14,7 +14,10 @@ class AppointmentBase(BaseModel):
 
 
 class AppointmentCreate(AppointmentBase):
-    client_id: str
+    # client_id para clientes del portal; contact_* para leads sin cuenta
+    client_id: Optional[str] = None
+    contact_name: Optional[str] = None
+    contact_phone: Optional[str] = None
     status: str = "scheduled"
 
 
@@ -31,7 +34,10 @@ class AppointmentUpdate(BaseModel):
 
 class AppointmentResponse(AppointmentBase):
     id: str
-    client_id: str
+    client_id: Optional[str] = None
+    contact_name: Optional[str] = None
+    contact_phone: Optional[str] = None
+    conversation_id: Optional[str] = None
     status: str
     source: str
     created_at: datetime

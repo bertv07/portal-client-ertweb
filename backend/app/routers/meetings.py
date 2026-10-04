@@ -1,22 +1,22 @@
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-import httpx
+from sqlalchemy import select
 
-from app.core.config import settings
 from app.core.database import get_db
 from app.api.deps import get_current_user
 from app.models.user import User
 from app.models.appointment import Appointment
+from app.services.n8n import post_webhook
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/meetings", tags=["meetings"])
 
 class MeetingScheduleRequest(BaseModel):
-    meeting_date: str
+    meeting_date: date
     time_slot: str
     topic: str
 
@@ -27,11 +27,25 @@ async def schedule_meeting(
     db: AsyncSession = Depends(get_db),
 ):
     """Client: Schedule a meeting. Persists in DB and triggers n8n Google Calendar workflow."""
+    if req.meeting_date < datetime.now(timezone.utc).date():
+        raise HTTPException(status_code=400, detail="La fecha de la reunión ya pasó")
+
+    # Evita que el mismo horario quede reservado dos veces
+    taken = await db.execute(
+        select(Appointment.id).where(
+            Appointment.appointment_date == req.meeting_date,
+            Appointment.time_slot == req.time_slot,
+            Appointment.status == "scheduled",
+        )
+    )
+    if taken.first():
+        raise HTTPException(status_code=409, detail="Ese horario ya está reservado. Elige otro.")
+
     # Persist the appointment in the database
     appointment = Appointment(
         client_id=current_user.id,
         title=req.topic,
-        appointment_date=datetime.strptime(req.meeting_date, "%Y-%m-%d").date(),
+        appointment_date=req.meeting_date,
         time_slot=req.time_slot,
         duration_minutes=30,
         status="scheduled",
@@ -45,27 +59,40 @@ async def schedule_meeting(
         "client_id": current_user.id,
         "client_name": current_user.name,
         "client_email": current_user.email,
-        "meeting_date": req.meeting_date,
+        "meeting_date": req.meeting_date.isoformat(),
         "time_slot": req.time_slot,
         "topic": req.topic,
         "appointment_id": appointment.id,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
-    
-    webhook_url = f"{settings.N8N_WEBHOOK_BASE_URL}/webhook/schedule-meeting"
-    n8n_status = "offline"
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(webhook_url, json=payload, timeout=5.0)
-            if response.status_code == 200:
-                logger.info("Reunión agendada vía n8n — cliente %s", current_user.id)
-                n8n_status = "success"
-    except Exception as exc:
-        logger.warning("n8n offline al agendar reunión: %s", exc)
+
+    ok, data, _ = await post_webhook("/webhook/schedule-meeting", payload, timeout=8.0)
+    # Si el workflow devuelve el link de Meet, queda guardado en la cita
+    meeting_link = data.get("meeting_link") or data.get("hangoutLink")
+    if ok and meeting_link:
+        appointment.meeting_link = meeting_link
+        await db.commit()
 
     return {
-        "message": "Reunión agendada exitosamente." if n8n_status == "success" else "Reunión registrada localmente (n8n offline).",
+        "message": "Reunión agendada exitosamente." if ok else "Reunión registrada localmente (n8n offline).",
         "payload": payload,
-        "n8n_status": n8n_status,
+        "n8n_status": "success" if ok else "offline",
         "appointment_id": appointment.id,
+        "meeting_link": appointment.meeting_link,
     }
+
+
+@router.get("/taken-slots")
+async def get_taken_slots(
+    meeting_date: date,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Horarios ya reservados de un día (para deshabilitarlos en la Agenda)."""
+    result = await db.execute(
+        select(Appointment.time_slot).where(
+            Appointment.appointment_date == meeting_date,
+            Appointment.status == "scheduled",
+        )
+    )
+    return {"taken": sorted({slot for (slot,) in result.all()})}

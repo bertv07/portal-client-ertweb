@@ -1,275 +1,135 @@
 import { useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { FileText, Upload, CheckCircle2, AlertCircle, Clock, Trash2, ShieldAlert } from 'lucide-react';
+import { FileText, Upload, Trash2, ExternalLink, FolderOpen } from 'lucide-react';
 import api from '../../lib/axios';
+import { apiError, shortDate } from '../../lib/format';
+import { Badge, Button, Card, CardTitle, EmptyState, ErrorText, Spinner, inputClass } from '../../components/ui';
 
-const STATUS_COLORS = {
-  pending: 'text-amber-600 bg-amber-50 border-amber-100',
-  review: 'text-blue-600 bg-blue-50 border-blue-100',
-  approved: 'text-green-600 bg-green-50 border-green-100',
-  rejected: 'text-red-600 bg-red-50 border-red-100',
-};
-
-const STATUS_LABELS = {
-  pending: 'Pendiente de subir',
-  review: 'En revisión',
-  approved: 'Aprobado',
-  rejected: 'Rechazado',
-};
+const STATUS = { pending: ['Por subir', 'amber'], review: ['En revisión', 'blue'], approved: ['Aprobado', 'green'], rejected: ['Rechazado', 'red'] };
+const ACCEPT = '.pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xlsx';
 
 export default function Documents() {
   const qc = useQueryClient();
-  const fileInputRef = useRef(null);
-  const generalFileInputRef = useRef(null);
+  const slotInputRef = useRef(null);
+  const generalInputRef = useRef(null);
   const [selectedDocId, setSelectedDocId] = useState(null);
-  const [uploadStatus, setUploadStatus] = useState('');
-  const [generalDocName, setGeneralDocName] = useState('');
+  const [generalName, setGeneralName] = useState('');
+  const refresh = () => qc.invalidateQueries({ queryKey: ['my-documents'] });
 
-  // Fetch real client documents
-  const { data: documents = [], isLoading } = useQuery({
-    queryKey: ['my-documents'],
-    queryFn: () => api.get('/documents/me').then(r => r.data),
+  const { data: documents = [], isLoading } = useQuery({ queryKey: ['my-documents'], queryFn: () => api.get('/documents/me').then((r) => r.data) });
+
+  const upload = (url, formData) => api.post(url, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+
+  const slotMutation = useMutation({
+    mutationFn: ({ docId, file }) => { const fd = new FormData(); fd.append('file', file); return upload(`/documents/${docId}/upload`, fd); },
+    onSuccess: refresh,
   });
-
-  // Mutation to upload file to a specific slot
-  const uploadToSlotMutation = useMutation({
-    mutationFn: ({ docId, file }) => {
-      const formData = new FormData();
-      formData.append('file', file);
-      return api.post(`/documents/${docId}/upload`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-    },
-    onSuccess: () => {
-      setUploadStatus('success');
-      qc.invalidateQueries(['my-documents']);
-      setTimeout(() => {
-        setUploadStatus('');
-        setSelectedDocId(null);
-      }, 2000);
-    },
-    onError: () => {
-      setUploadStatus('error');
-      setTimeout(() => setUploadStatus(''), 3000);
-    },
-  });
-
-  // Mutation to upload a new general document
-  const uploadGeneralMutation = useMutation({
+  const generalMutation = useMutation({
     mutationFn: ({ file, name }) => {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('name', name);
-      formData.append('doc_type', 'general');
-      return api.post('/documents/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const fd = new FormData();
+      fd.append('file', file); fd.append('name', name); fd.append('doc_type', 'general');
+      return upload('/documents/upload', fd);
     },
-    onSuccess: () => {
-      setUploadStatus('success');
-      setGeneralDocName('');
-      qc.invalidateQueries(['my-documents']);
-      setTimeout(() => setUploadStatus(''), 2000);
-    },
-    onError: () => {
-      setUploadStatus('error');
-      setTimeout(() => setUploadStatus(''), 3000);
-    },
+    onSuccess: () => { setGeneralName(''); refresh(); },
   });
+  const deleteMutation = useMutation({ mutationFn: (id) => api.delete(`/documents/${id}`), onSuccess: refresh });
 
-  // Delete mutation
-  const deleteMutation = useMutation({
-    mutationFn: (id) => api.delete(`/documents/${id}`),
-    onSuccess: () => qc.invalidateQueries(['my-documents']),
-  });
+  const failed = [slotMutation, generalMutation, deleteMutation].find((m) => m.isError);
 
-  const handleUploadClick = (docId) => {
-    setSelectedDocId(docId);
-    fileInputRef.current?.click();
-  };
+  if (isLoading) return <Spinner />;
 
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file && selectedDocId) {
-      setUploadStatus('uploading');
-      uploadToSlotMutation.mutate({ docId: selectedDocId, file });
-    }
-  };
-
-  const handleGeneralFileChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const name = generalDocName.trim() || file.name.split('.')[0];
-      setUploadStatus('uploading');
-      uploadGeneralMutation.mutate({ file, name });
-    }
-  };
-
-  const pendingDocs = documents.filter(d => d.status === 'pending');
-  const uploadedDocs = documents.filter(d => d.status !== 'pending');
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center py-20">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600"></div>
-      </div>
-    );
-  }
+  // "Requeridos": lo que pidió el equipo y falta subir o hay que volver a subir
+  const required = documents.filter((d) => d.status === 'pending' || (d.status === 'rejected' && d.source === 'required'));
+  const others = documents.filter((d) => !required.includes(d));
 
   return (
-    <div className="flex flex-col gap-6 animate-in fade-in duration-300">
-      {/* Hidden file inputs */}
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
       <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileChange}
-        className="hidden"
-        accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xlsx"
+        type="file" ref={slotInputRef} className="hidden" accept={ACCEPT}
+        onChange={(e) => { const file = e.target.files?.[0]; if (file && selectedDocId) slotMutation.mutate({ docId: selectedDocId, file }); e.target.value = ''; }}
       />
       <input
-        type="file"
-        ref={generalFileInputRef}
-        onChange={handleGeneralFileChange}
-        className="hidden"
-        accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xlsx"
+        type="file" ref={generalInputRef} className="hidden" accept={ACCEPT}
+        onChange={(e) => { const file = e.target.files?.[0]; if (file) generalMutation.mutate({ file, name: generalName.trim() || file.name.replace(/\.[^.]+$/, '') }); e.target.value = ''; }}
       />
 
-      <div className="bg-white rounded-[32px] p-6 shadow-xl shadow-brand-500/5">
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Mis Archivos</h2>
-        <p className="text-sm text-gray-500 mb-6 leading-relaxed">
-          Gestiona los archivos y documentos oficiales del proyecto.
-        </p>
+      <div className="lg:col-span-2 flex flex-col gap-5">
+        {failed && <ErrorText>{apiError(failed.error, 'No se pudo completar la acción (máx. 10 MB; PDF, imagen, Word o Excel).')}</ErrorText>}
 
-        {/* Upload Status Toast */}
-        {uploadStatus && (
-          <div className="mb-6 p-3 bg-brand-600 text-white rounded-xl text-xs font-semibold flex items-center gap-2 justify-center">
-            {uploadStatus === 'uploading' && (
-              <>
-                <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white" />
-                Subiendo archivo...
-              </>
-            )}
-            {uploadStatus === 'success' && (
-              <>
-                <CheckCircle2 className="w-4 h-4" />
-                ¡Archivo subido exitosamente!
-              </>
-            )}
-            {uploadStatus === 'error' && 'Error al subir archivo. Formato no soportado o archivo excedió 10MB.'}
-          </div>
-        )}
-
-        {/* Section 1: Required Document Slots */}
-        {pendingDocs.length > 0 && (
-          <div className="mb-8">
-            <h3 className="font-bold text-gray-800 text-sm mb-3 flex items-center gap-1.5">
-              <AlertCircle className="w-4 h-4 text-amber-500" /> Requeridos por el administrador
-            </h3>
-            <div className="flex flex-col gap-3">
-              {pendingDocs.map((doc) => (
-                <div key={doc.id} className="border border-brand-100 rounded-2xl p-4 flex items-center justify-between gap-3 shadow-sm">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="p-2.5 bg-amber-50 text-amber-600 rounded-xl shrink-0">
-                      <FileText className="w-5 h-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className="text-xs font-bold text-gray-800 truncate">{doc.name}</h4>
-                      <p className="text-[10px] text-amber-600 font-semibold mt-0.5 capitalize truncate">{doc.doc_type}</p>
+        {required.length > 0 && (
+          <Card className="p-6">
+            <CardTitle action={<Badge tone="amber" dot>{required.length} pendiente(s)</Badge>}>Te pedimos estos documentos</CardTitle>
+            <div className="flex flex-col gap-2.5">
+              {required.map((doc) => (
+                <div key={doc.id} className="flex items-center gap-3 bg-brand-50/70 rounded-2xl p-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-white text-brand-600 flex items-center justify-center shrink-0"><FileText className="w-5 h-5" /></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-bold text-gray-900 truncate">{doc.name}</div>
+                    <div className="text-xs text-gray-500 truncate">
+                      {doc.status === 'rejected' ? `Rechazado: ${doc.admin_notes || 'vuelve a subirlo'}` : <span className="capitalize">{doc.doc_type}</span>}
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleUploadClick(doc.id)}
-                    className="bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all duration-200 shrink-0"
+                  <Button
+                    size="sm" loading={slotMutation.isPending && selectedDocId === doc.id}
+                    onClick={() => { setSelectedDocId(doc.id); slotMutation.reset(); slotInputRef.current?.click(); }}
                   >
-                    Subir
-                  </button>
+                    <Upload className="w-3.5 h-3.5" /> Subir
+                  </Button>
                 </div>
               ))}
             </div>
-          </div>
+          </Card>
         )}
 
-        {/* Section 2: General Upload Trigger */}
-        <div className="border-2 border-dashed border-brand-200 bg-brand-50/20 rounded-[32px] p-6 text-center flex flex-col items-center justify-center mb-8">
-          <div className="w-12 h-12 bg-brand-100 rounded-xl flex items-center justify-center text-brand-600 mb-3 shadow-sm">
-            <Upload className="w-5 h-5" />
-          </div>
-          <h3 className="font-bold text-brand-900 text-sm mb-1">Sube un archivo general</h3>
-          <p className="text-[10px] text-gray-500 mb-4">PDF, Excel, Word, imágenes hasta 10MB</p>
-          <div className="flex gap-2 w-full max-w-xs">
-            <input
-              type="text"
-              placeholder="Nombre del archivo (opcional)"
-              className="flex-1 text-xs border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-brand-400"
-              value={generalDocName}
-              onChange={e => setGeneralDocName(e.target.value)}
-            />
-            <button
-              onClick={() => generalFileInputRef.current?.click()}
-              className="bg-brand-600 text-white font-semibold text-xs px-4 py-2 rounded-xl hover:bg-brand-700 transition-colors shrink-0"
-            >
-              Seleccionar
-            </button>
-          </div>
-        </div>
-
-        {/* Section 3: Uploaded Files */}
-        <div>
-          <h3 className="font-bold text-gray-800 text-sm mb-4">Documentos subidos</h3>
-          {uploadedDocs.length === 0 ? (
-            <p className="text-xs text-gray-400 text-center py-6">Aún no has subido documentos.</p>
+        <Card className="p-6">
+          <CardTitle>Tus documentos</CardTitle>
+          {others.length === 0 ? (
+            <EmptyState icon={FolderOpen} title="Aún no hay documentos">Aquí verás tus archivos, contratos y términos del proyecto.</EmptyState>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {uploadedDocs.map((doc) => (
-                <div key={doc.id} className="border border-gray-100 rounded-2xl p-4 shadow-sm bg-gray-50/50 flex flex-col gap-3 relative">
-                  {/* Delete button */}
-                  <button
-                    onClick={() => { if (confirm(`¿Eliminar ${doc.name}?`)) deleteMutation.mutate(doc.id); }}
-                    className="absolute top-3 right-3 text-gray-300 hover:text-red-500 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-
-                  <div className="flex items-start gap-3">
-                    <div className="p-2.5 bg-white border border-gray-100 rounded-xl text-brand-600 shrink-0">
-                      <FileText className="w-5 h-5" />
+            <div className="flex flex-col divide-y divide-brand-50">
+              {others.map((doc) => (
+                <div key={doc.id} className="py-3.5 first:pt-0 last:pb-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0"><FileText className="w-5 h-5" /></div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold text-gray-900 truncate" title={doc.name}>{doc.name}</div>
+                      <div className="text-xs text-gray-500 truncate">{doc.original_filename || doc.doc_type} · {shortDate(doc.updated_at)}</div>
                     </div>
-                    <div className="min-w-0 pr-6">
-                      <h4 className="text-xs font-bold text-gray-800 truncate" title={doc.name}>{doc.name}</h4>
-                      <p className="text-[10px] text-gray-400 truncate mt-0.5">{doc.original_filename || 'Cargando...'}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between mt-1 pt-3 border-t border-gray-100">
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border ${STATUS_COLORS[doc.status] || ''}`}>
-                      {STATUS_LABELS[doc.status]}
-                    </span>
+                    <Badge tone={STATUS[doc.status]?.[1]} dot>{STATUS[doc.status]?.[0] || doc.status}</Badge>
                     {doc.file_url && (
-                      <a
-                        href={doc.file_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[10px] font-bold text-brand-600 hover:text-brand-700 transition-colors"
-                      >
-                        Ver archivo
+                      <a href={doc.file_url} target="_blank" rel="noreferrer" aria-label={`Ver ${doc.name}`} className="p-2 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-900">
+                        <ExternalLink className="w-4 h-4" />
                       </a>
                     )}
+                    {doc.status !== 'approved' && (
+                      <Button
+                        variant="ghost" size="icon" className="hover:!bg-red-50 hover:!text-red-600" aria-label={`Eliminar ${doc.name}`}
+                        onClick={() => { if (confirm(`¿Eliminar "${doc.name}"?`)) deleteMutation.mutate(doc.id); }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
-
-                  {doc.admin_notes && (
-                    <div className="bg-red-50 text-red-600 p-2.5 rounded-xl text-[10px] font-medium flex gap-1.5 mt-1 border border-red-100">
-                      <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
-                      <div>
-                        <span className="font-bold">Nota del administrador:</span> {doc.admin_notes}
-                      </div>
-                    </div>
+                  {doc.status === 'rejected' && doc.admin_notes && (
+                    <p className="text-xs text-red-700 bg-red-50 rounded-xl px-3 py-2 mt-2">Motivo: {doc.admin_notes}</p>
                   )}
                 </div>
               ))}
             </div>
           )}
-        </div>
+        </Card>
       </div>
+
+      <Card className="p-6 self-start">
+        <div className="w-11 h-11 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center mb-3"><Upload className="w-5 h-5" /></div>
+        <h2 className="font-bold text-gray-900">Enviar un archivo</h2>
+        <p className="text-xs text-gray-500 mt-1 mb-4 leading-relaxed">Textos, imágenes, accesos o cualquier material para tu proyecto. PDF, imágenes, Word o Excel, hasta 10 MB.</p>
+        <input className={inputClass} placeholder="Nombre del archivo (opcional)" value={generalName} onChange={(e) => setGeneralName(e.target.value)} />
+        <Button className="w-full mt-3" loading={generalMutation.isPending} onClick={() => { generalMutation.reset(); generalInputRef.current?.click(); }}>
+          Elegir archivo
+        </Button>
+        {generalMutation.isSuccess && <p className="text-xs font-semibold text-emerald-700 mt-3">Archivo enviado. Lo revisaremos pronto.</p>}
+      </Card>
     </div>
   );
 }

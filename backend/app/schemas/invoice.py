@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime, date
 from typing import Optional
 
@@ -6,9 +6,9 @@ from typing import Optional
 class InvoiceCreate(BaseModel):
     client_id: str
     project_id: Optional[str] = None
-    number: str
+    number: Optional[str] = None  # si no viene se genera (INV-2026-001)
     description: Optional[str] = None
-    amount: float
+    amount: float = Field(gt=0)
     currency: str = "USD"
     status: str = "pending"
     due_date: Optional[date] = None

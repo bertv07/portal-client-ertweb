@@ -7,8 +7,11 @@ from typing import List
 from app.core.database import get_db
 from app.models.appointment import Appointment
 from app.schemas.appointment import AppointmentCreate, AppointmentUpdate, AppointmentResponse
-from app.api.deps import get_current_user, get_current_admin_user, require_admin_or_n8n
+from app.api.deps import (
+    get_current_user, get_current_admin_user, get_current_staff_user, require_staff_or_n8n,
+)
 from app.models.user import User
+from app.services.notify import add_notification
 
 logger = logging.getLogger(__name__)
 
@@ -31,26 +34,26 @@ async def get_my_appointments(
     return result.scalars().all()
 
 
-# ── Admin: all appointments ──────────────────────────────────────────
+# ── Staff: all appointments ──────────────────────────────────────────
 @router.get("/", response_model=List[AppointmentResponse])
 async def get_all_appointments(
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(get_current_admin_user),
+    caller: str = Depends(require_staff_or_n8n),
 ):
-    """Admin: get all appointments across all clients."""
+    """Admin / vendedor / n8n: todas las citas (clientes y leads)."""
     stmt = select(Appointment).order_by(Appointment.appointment_date.desc(), Appointment.time_slot.desc())
     result = await db.execute(stmt)
     return result.scalars().all()
 
 
-# ── Admin: appointments for a specific client ────────────────────────
+# ── Staff: appointments for a specific client ────────────────────────
 @router.get("/client/{client_id}", response_model=List[AppointmentResponse])
 async def get_client_appointments(
     client_id: str,
     db: AsyncSession = Depends(get_db),
-    caller: str = Depends(require_admin_or_n8n),
+    caller: str = Depends(require_staff_or_n8n),
 ):
-    """Admin: get all appointments for a specific client."""
+    """Admin / vendedor / n8n: citas de un cliente específico."""
     stmt = (
         select(Appointment)
         .where(Appointment.client_id == client_id)
@@ -60,39 +63,54 @@ async def get_client_appointments(
     return result.scalars().all()
 
 
-# ── Create appointment (Admin JWT or n8n API key) ────────────────────
+# ── Create appointment (staff JWT or n8n API key) ────────────────────
 @router.post("/", response_model=AppointmentResponse, status_code=status.HTTP_201_CREATED)
 async def create_appointment(
     appt_in: AppointmentCreate,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    caller: str = Depends(require_admin_or_n8n),
+    caller: str = Depends(require_staff_or_n8n),
 ):
-    """Create appointment. Accepts admin JWT or X-N8N-API-Key."""
-    # Verify client exists
-    from app.models.user import User as UserModel
-    client_check = await db.execute(select(UserModel).where(UserModel.id == appt_in.client_id))
-    if not client_check.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Client not found")
+    """Crea una cita. Acepta JWT de admin/vendedor o X-N8N-API-Key.
 
-    source = "n8n" if caller == "n8n" else "admin"
-    appointment = Appointment(**appt_in.model_dump(), source=source)
+    Con client_id la cita es de un cliente del portal (le aparece en su Agenda).
+    Sin client_id es una cita con un lead: se identifica con contact_name / contact_phone.
+    """
+    if appt_in.client_id:
+        client_check = await db.execute(select(User).where(User.id == appt_in.client_id))
+        if not client_check.scalar_one_or_none():
+            raise HTTPException(status_code=404, detail="Client not found")
+    elif not (appt_in.contact_name or appt_in.contact_phone):
+        raise HTTPException(status_code=400, detail="Indica un cliente o el nombre/teléfono del contacto")
+
+    staff = getattr(request.state, "user", None)
+    appointment = Appointment(
+        **appt_in.model_dump(),
+        source=caller,
+        created_by=staff.id if staff else None,
+    )
     db.add(appointment)
+    if appt_in.client_id:
+        add_notification(
+            db, appt_in.client_id, "Nueva cita agendada",
+            f"{appt_in.title} — {appt_in.appointment_date.strftime('%d/%m/%Y')} a las {appt_in.time_slot}.",
+            type="update",
+        )
     await db.commit()
     await db.refresh(appointment)
-    logger.info("Cita creada por %s — cliente %s, fecha %s", source, appt_in.client_id, appt_in.appointment_date)
+    logger.info("Cita creada por %s — fecha %s", caller, appt_in.appointment_date)
     return appointment
 
 
-# ── Update appointment (Admin only) ─────────────────────────────────
+# ── Update appointment (staff) ───────────────────────────────────────
 @router.put("/{appointment_id}", response_model=AppointmentResponse)
 async def update_appointment(
     appointment_id: str,
     appt_in: AppointmentUpdate,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(get_current_admin_user),
+    caller: str = Depends(require_staff_or_n8n),
 ):
-    """Admin: update an appointment."""
+    """Admin / vendedor / n8n: actualiza una cita (p. ej. n8n guarda el link de Meet)."""
     stmt = select(Appointment).where(Appointment.id == appointment_id)
     result = await db.execute(stmt)
     appointment = result.scalar_one_or_none()
@@ -113,13 +131,15 @@ async def update_appointment(
 async def delete_appointment(
     appointment_id: str,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(get_current_admin_user),
+    staff: User = Depends(get_current_staff_user),
 ):
-    """Admin: delete an appointment."""
+    """Admin: elimina cualquier cita. Vendedor: solo las que creó él."""
     stmt = select(Appointment).where(Appointment.id == appointment_id)
     result = await db.execute(stmt)
     appointment = result.scalar_one_or_none()
     if not appointment:
         raise HTTPException(status_code=404, detail="Appointment not found")
+    if staff.role != "admin" and appointment.created_by != staff.id:
+        raise HTTPException(status_code=403, detail="Solo puedes eliminar las citas que creaste")
     await db.delete(appointment)
     await db.commit()

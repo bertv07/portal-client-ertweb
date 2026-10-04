@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 
 class DocumentResponse(BaseModel):
@@ -23,7 +23,7 @@ class DocumentResponse(BaseModel):
 
 
 class DocumentStatusUpdate(BaseModel):
-    status: str  # review | approved | rejected
+    status: Literal["review", "approved", "rejected"]
     admin_notes: Optional[str] = None
 
 

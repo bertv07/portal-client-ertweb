@@ -27,7 +27,7 @@ export default function ChangePasswordModal({ onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-brand-950/50 z-[80] flex items-center justify-center p-4">
       <div className="bg-white rounded-[32px] p-6 w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95 duration-200">
         <button onClick={onClose} className="float-right p-1.5 rounded-xl hover:bg-gray-50 text-gray-400 mb-2">
           <X className="w-5 h-5" />

@@ -9,7 +9,6 @@ from functools import lru_cache
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from weasyprint import HTML
 
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
 
@@ -28,5 +27,9 @@ def _logo_data_uri() -> str:
 def render_pdf(template_name: str, context: dict) -> bytes:
     """Renderiza una plantilla de app/assets a PDF. Bloqueante: llamar con
     run_in_threadpool desde endpoints async."""
+    # Import perezoso: WeasyPrint necesita librerías del sistema (pango) que solo
+    # están en la imagen Docker; así el resto de la API arranca sin ellas.
+    from weasyprint import HTML
+
     html = _env.get_template(template_name).render(logo_src=_logo_data_uri(), **context)
     return HTML(string=html).write_pdf()

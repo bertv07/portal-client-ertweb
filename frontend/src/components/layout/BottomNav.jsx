@@ -1,4 +1,4 @@
-import { Home, FolderOpen, Wallet, Calendar, Settings } from 'lucide-react';
+import { Home, FolderOpen, Wallet, Calendar, Wrench } from 'lucide-react';
 import { NavLink } from 'react-router';
 import clsx from 'clsx';
 
@@ -7,7 +7,7 @@ const NAV_ITEMS = [
   { path: '/schedule', icon: Calendar, label: 'Agenda' },
   { path: '/dashboard', icon: Home, label: 'Inicio' },
   { path: '/billing', icon: Wallet, label: 'Pagos' },
-  { path: '/maintenance', icon: Settings, label: 'Soporte' },
+  { path: '/maintenance', icon: Wrench, label: 'Mantenimiento' },
 ];
 
 export default function BottomNav() {

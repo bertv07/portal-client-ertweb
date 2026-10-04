@@ -1,5 +1,6 @@
 @import "tailwindcss";
-@import url("https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&family=JetBrains+Mono:wght@400;500&display=swap");
+/* Las fuentes (Montserrat, JetBrains Mono) se cargan con <link> en index.html:
+   un @import url() después del de Tailwind queda fuera de lugar y se descarta al compilar. */
 
 /* Paleta e identidad tomadas de ertweb.com (portafolio) — mismo morado de marca,
    mismo acento y misma tipografía, para que el portal se sienta parte de la

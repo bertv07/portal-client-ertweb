@@ -6,7 +6,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, update
 from starlette.concurrency import run_in_threadpool
 from typing import List, Optional
 
@@ -14,15 +14,26 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.models.invoice import Invoice
 from app.models.project import Project
+from app.models.manual_payment import ManualPayment
 from app.schemas.invoice import InvoiceCreate, InvoiceUpdate, InvoiceResponse
 from app.api.deps import get_current_user, get_current_admin_user, require_admin_or_n8n
 from app.models.user import User
 from app.services.pdf import render_pdf
+from app.services.notify import add_notification
 
 UPLOAD_DIR = Path("uploads/invoices")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 router = APIRouter(prefix="/invoices", tags=["invoices"])
+
+
+async def _next_invoice_number(db: AsyncSession) -> str:
+    prefix = f"INV-{datetime.now(timezone.utc).year}-"
+    existing = {n for (n,) in (await db.execute(select(Invoice.number).where(Invoice.number.like(f"{prefix}%")))).all()}
+    seq = len(existing) + 1
+    while f"{prefix}{seq:03d}" in existing:
+        seq += 1
+    return f"{prefix}{seq:03d}"
 
 
 @router.get("/me", response_model=List[InvoiceResponse])
@@ -39,9 +50,9 @@ async def get_my_invoices(
 @router.get("/", response_model=List[InvoiceResponse])
 async def get_all_invoices(
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(get_current_admin_user),
+    caller: str = Depends(require_admin_or_n8n),
 ):
-    """Admin: get all invoices."""
+    """Admin / n8n: get all invoices."""
     stmt = select(Invoice).order_by(Invoice.created_at.desc())
     result = await db.execute(stmt)
     return result.scalars().all()
@@ -65,9 +76,30 @@ async def create_invoice(
     db: AsyncSession = Depends(get_db),
     caller: str = Depends(require_admin_or_n8n),
 ):
-    """Admin: create a new invoice."""
-    invoice = Invoice(**invoice_in.model_dump())
+    """Admin / n8n: crea una factura. Si no se envía `number` se genera el siguiente."""
+    client = await db.get(User, invoice_in.client_id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    data = invoice_in.model_dump()
+    number = (data.get("number") or "").strip()
+    if number:
+        dup = await db.execute(select(Invoice.id).where(Invoice.number == number))
+        if dup.first():
+            raise HTTPException(status_code=400, detail=f"Ya existe una factura con el número {number}")
+    else:
+        number = await _next_invoice_number(db)
+    data["number"] = number
+    if data.get("status") == "paid":
+        data["paid_at"] = datetime.now(timezone.utc)
+
+    invoice = Invoice(**data)
     db.add(invoice)
+    add_notification(
+        db, invoice.client_id, "Nueva factura",
+        f"Se emitió la factura {number} por {invoice.amount:,.2f} {invoice.currency}.",
+        type="document",
+    )
     await db.commit()
     await db.refresh(invoice)
     return invoice
@@ -88,7 +120,9 @@ async def upload_invoice_pdf(
         raise HTTPException(status_code=404, detail="Invoice not found")
 
     # Save file
-    ext = Path(file.filename).suffix
+    ext = Path(file.filename or "").suffix.lower()
+    if ext != ".pdf":
+        raise HTTPException(status_code=400, detail="Solo se aceptan archivos PDF")
     filename = f"{invoice_id}{ext}"
     file_path = UPLOAD_DIR / filename
     with open(file_path, "wb") as f:
@@ -178,43 +212,17 @@ async def update_invoice(
     update_data = invoice_in.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(invoice, key, value)
+    if invoice.status == "paid" and not invoice.paid_at:
+        invoice.paid_at = datetime.now(timezone.utc)
+    elif invoice.status != "paid":
+        invoice.paid_at = None
 
-    await db.commit()
-    await db.refresh(invoice)
-    return invoice
-
-
-@router.post("/{invoice_id}/pay", response_model=InvoiceResponse)
-async def pay_invoice(
-    invoice_id: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Client: simulate a payment on an invoice, triggering automation flow."""
-    stmt = select(Invoice).where(Invoice.id == invoice_id)
-    result = await db.execute(stmt)
-    invoice = result.scalar_one_or_none()
-    if not invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found")
-
-    if invoice.client_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized")
-
-    from datetime import datetime, timezone
-    invoice.status = "paid"
-    invoice.paid_at = datetime.now(timezone.utc)
-    
-    # Simulating n8n webhook notification triggers
-    # In production, this would trigger an n8n webhook like:
-    # httpx.post("https://n8n.yourdomain.com/webhook/invoice-paid", json={"invoice_id": invoice.id, "amount": invoice.amount})
-    
     await db.commit()
     await db.refresh(invoice)
     return invoice
 
 
 @router.delete("/{invoice_id}", status_code=status.HTTP_204_NO_CONTENT)
-
 async def delete_invoice(
     invoice_id: str,
     db: AsyncSession = Depends(get_db),
@@ -226,5 +234,7 @@ async def delete_invoice(
     invoice = result.scalar_one_or_none()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
+    # Los comprobantes ligados a la factura se conservan, solo se desvinculan
+    await db.execute(update(ManualPayment).where(ManualPayment.invoice_id == invoice_id).values(invoice_id=None))
     await db.delete(invoice)
     await db.commit()

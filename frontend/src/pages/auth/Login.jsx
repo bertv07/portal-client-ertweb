@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { motion } from 'motion/react';
 import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { homeFor } from '../../lib/roles';
 import ertLogoWhite from '../../assets/ert-logo-white.png';
 
 const EASE_OUT = [0.16, 1, 0.3, 1]; // expo.out
@@ -35,7 +36,7 @@ export default function Login() {
   // Ya hay una sesión activa — no tiene sentido mostrar el login de nuevo.
   useEffect(() => {
     if (user) {
-      navigate(user.role === 'admin' ? '/admin' : '/dashboard', { replace: true });
+      navigate(homeFor(user.role), { replace: true });
     }
   }, [user, navigate]);
 
@@ -46,12 +47,14 @@ export default function Login() {
 
     try {
       const loggedUser = await login(email, password);
-      navigate(loggedUser.role === 'admin' ? '/admin' : '/dashboard', { replace: true });
+      navigate(homeFor(loggedUser.role), { replace: true });
     } catch (err) {
       if (!err.response) {
         setError('No se pudo conectar con el servidor. Intenta de nuevo en unos segundos.');
       } else if (err.response.status === 400 || err.response.status === 401) {
         setError('Correo o contraseña incorrectos.');
+      } else if (err.response.status === 403) {
+        setError('Esta cuenta está desactivada. Contacta al administrador.');
       } else {
         setError('Ocurrió un error inesperado. Intenta de nuevo.');
       }
@@ -77,7 +80,7 @@ export default function Login() {
         {/* Marca */}
         <motion.div variants={item} className="flex flex-col items-center mb-8 text-center">
           <img src={ertLogoWhite} alt="ertweb" className="h-10 w-auto mb-5" />
-          <h1 className="text-2xl font-extrabold text-white tracking-tight">Portal de Clientes</h1>
+          <h1 className="text-2xl font-extrabold text-white tracking-tight">Portal ErtWeb</h1>
           <p className="mt-1.5 text-sm text-white/40">Diseño que piensa. Código que siente.</p>
         </motion.div>
 
@@ -171,7 +174,7 @@ export default function Login() {
         </motion.div>
 
         <motion.p variants={item} className="mt-6 text-center text-xs text-white/25">
-          ErtWeb &middot; Portal de Clientes
+          ErtWeb &middot; Clientes y equipo
         </motion.p>
       </motion.div>
     </div>

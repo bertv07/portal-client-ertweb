@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 class ManualPaymentBase(BaseModel):
     payment_method: str = "binance"
@@ -25,6 +25,17 @@ class ManualPaymentResponse(ManualPaymentBase):
     class Config:
         from_attributes = True
 
+class ManualPaymentFromN8n(BaseModel):
+    """Comprobante que el cliente envió por WhatsApp y registra el bot."""
+    client_id: str
+    amount: float
+    currency: str = "USD"
+    payment_method: str = "binance"
+    transaction_ref: Optional[str] = None
+    invoice_id: Optional[str] = None
+    plan_id: Optional[str] = None
+    notes: Optional[str] = None
+
 class ManualPaymentStatusUpdate(BaseModel):
-    status: str # approved | rejected
+    status: Literal["approved", "rejected"]
     admin_notes: Optional[str] = None

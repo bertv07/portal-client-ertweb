@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
-from app.routers import notifications, auth, projects, invoices, documents, users, maintenance, meetings, payments, manual_payments, appointments, terms
+from app.routers import notifications, auth, projects, invoices, documents, users, maintenance, meetings, payments, manual_payments, appointments, terms, whatsapp
 
 from sqlalchemy import select
 from app.core.database import SessionLocal
@@ -50,15 +50,16 @@ app.include_router(payments.router, prefix=settings.API_V1_STR)
 app.include_router(manual_payments.router, prefix=settings.API_V1_STR)
 app.include_router(appointments.router, prefix=settings.API_V1_STR)
 app.include_router(terms.router, prefix=settings.API_V1_STR)
+app.include_router(whatsapp.router, prefix=settings.API_V1_STR)
 
 
 
 @app.on_event("startup")
 async def startup_event():
-    # Seed default users
     async with SessionLocal() as db:
-        admin_email = "gleybertmartinez0702@gmail.com"
-        admin_name = "ert"
+        # ── Admin inicial ────────────────────────────────────────────────
+        admin_email = settings.ADMIN_EMAIL.strip().lower()
+        admin_name = settings.ADMIN_NAME
         result = await db.execute(select(User).where(User.email == admin_email))
         admin = result.scalar_one_or_none()
 
@@ -72,11 +73,6 @@ async def startup_event():
                 admin.name = admin_name
                 logger.warning("Admin admin@ertweb.com migrado a %s", admin_email)
 
-
-        client_email = "client@example.com"
-        result_client = await db.execute(select(User).where(User.email == client_email))
-        client = result_client.scalar_one_or_none()
-        
         if not admin:
             admin_password = settings.ADMIN_DEFAULT_PASSWORD or secrets.token_urlsafe(12)
             if not settings.ADMIN_DEFAULT_PASSWORD:
@@ -98,6 +94,17 @@ async def startup_event():
             # después del primer arranque, sincronizamos el hash guardado.
             admin.password_hash = get_password_hash(settings.ADMIN_DEFAULT_PASSWORD)
             logger.warning("Password de %s actualizada desde ADMIN_DEFAULT_PASSWORD", admin_email)
+
+        await db.commit()
+
+        # ── Datos demo (solo con SEED_DEMO_DATA=true) ────────────────────
+        # En producción no se crea ninguna cuenta ni dato de prueba.
+        if not settings.SEED_DEMO_DATA:
+            return
+
+        client_email = "client@example.com"
+        result_client = await db.execute(select(User).where(User.email == client_email))
+        client = result_client.scalar_one_or_none()
 
         if not client:
             client_password = settings.CLIENT_DEFAULT_PASSWORD or secrets.token_urlsafe(12)
@@ -194,9 +201,8 @@ async def startup_event():
                 project_id=project1.id,
                 name="Contrato de Prestación de Servicios Firmado",
                 original_filename="contrato_firmado_john.pdf",
-                file_url="/uploads/documents/mock_contrato.pdf",
+                file_url="",
                 file_type="pdf",
-                file_size_bytes=1024 * 350,
                 doc_type="contrato",
                 source="required",
                 status="approved"
@@ -214,7 +220,6 @@ async def startup_event():
                 status="paid",
                 due_date=date.today() - timedelta(days=20),
                 paid_at=datetime.now(timezone.utc) - timedelta(days=20),
-                pdf_url="/uploads/invoices/inv-2026-001.pdf"
             )
             inv2 = Invoice(
                 client_id=client.id,
@@ -293,6 +298,11 @@ async def startup_event():
             
             await db.commit()
 
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
 
 @app.get("/")

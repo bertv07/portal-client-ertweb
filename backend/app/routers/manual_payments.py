@@ -28,9 +28,10 @@ from app.core.database import get_db
 from app.models.manual_payment import ManualPayment
 from app.models.invoice import Invoice
 from app.models.maintenance import MaintenancePlan, MaintenancePayment
-from app.schemas.manual_payment import ManualPaymentResponse, ManualPaymentStatusUpdate
-from app.api.deps import get_current_user, get_current_admin_user, require_admin_or_n8n
+from app.schemas.manual_payment import ManualPaymentResponse, ManualPaymentStatusUpdate, ManualPaymentFromN8n
+from app.api.deps import get_current_user, get_current_admin_user, require_admin_or_n8n, require_n8n
 from app.models.user import User
+from app.services.notify import add_notification
 
 logger = logging.getLogger(__name__)
 
@@ -109,8 +110,33 @@ async def submit_manual_payment(
 
     Guarda en BD y notifica automáticamente a n8n para que el admin revise.
     """
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="El monto debe ser mayor a cero")
+
+    # Solo se puede reportar un pago sobre una factura o plan propio
+    if invoice_id:
+        invoice = await db.get(Invoice, invoice_id)
+        if not invoice or invoice.client_id != current_user.id:
+            raise HTTPException(status_code=404, detail="Factura no encontrada")
+        if invoice.status == "paid":
+            raise HTTPException(status_code=400, detail="La factura ya está pagada")
+    if plan_id:
+        plan = await db.get(MaintenancePlan, plan_id)
+        if not plan or plan.client_id != current_user.id:
+            raise HTTPException(status_code=404, detail="Plan no encontrado")
+
+    target = ManualPayment.invoice_id == invoice_id if invoice_id else ManualPayment.plan_id == plan_id if plan_id else None
+    if target is not None:
+        pending = await db.execute(
+            select(ManualPayment.id).where(
+                ManualPayment.client_id == current_user.id, ManualPayment.status == "pending", target
+            )
+        )
+        if pending.first():
+            raise HTTPException(status_code=400, detail="Ya enviaste un comprobante que está en revisión")
+
     proof_url = None
-    if file:
+    if file and file.filename:
         ext = Path(file.filename).suffix.lower()
         if ext not in ALLOWED_TYPES:
             raise HTTPException(status_code=400, detail=f"Tipo de archivo {ext} no permitido.")
@@ -144,6 +170,63 @@ async def submit_manual_payment(
     await _notify_n8n_new_payment(manual_payment, current_user)
 
     return manual_payment
+
+
+@router.post("/n8n", response_model=ManualPaymentResponse, status_code=status.HTTP_201_CREATED)
+async def submit_manual_payment_from_n8n(
+    body: ManualPaymentFromN8n,
+    db: AsyncSession = Depends(get_db),
+    caller: str = Depends(require_n8n),
+):
+    """n8n registra un comprobante que el cliente mandó por WhatsApp.
+
+    Queda pendiente de revisión igual que los que se suben desde el portal.
+    Sin invoice_id ni plan_id se asocia a la factura pendiente más antigua del
+    cliente, para que al aprobarlo esa factura quede pagada.
+    """
+    if body.amount <= 0:
+        raise HTTPException(status_code=400, detail="El monto debe ser mayor a cero")
+    if not await db.get(User, body.client_id):
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+
+    invoice_id = body.invoice_id
+    if invoice_id:
+        invoice = await db.get(Invoice, invoice_id)
+        if not invoice or invoice.client_id != body.client_id:
+            raise HTTPException(status_code=404, detail="Factura no encontrada")
+    elif not body.plan_id:
+        res = await db.execute(
+            select(Invoice.id)
+            .where(Invoice.client_id == body.client_id, Invoice.status.in_(("pending", "overdue")))
+            .order_by(Invoice.created_at.asc())
+        )
+        invoice_id = res.scalars().first()
+    if body.plan_id:
+        plan = await db.get(MaintenancePlan, body.plan_id)
+        if not plan or plan.client_id != body.client_id:
+            raise HTTPException(status_code=404, detail="Plan no encontrado")
+
+    # El bot puede reintentar: la misma referencia no se registra dos veces
+    if body.transaction_ref:
+        dup = await db.execute(
+            select(ManualPayment).where(
+                ManualPayment.client_id == body.client_id,
+                ManualPayment.transaction_ref == body.transaction_ref,
+            )
+        )
+        existing = dup.scalars().first()
+        if existing:
+            return existing
+
+    payment = ManualPayment(
+        client_id=body.client_id, invoice_id=invoice_id, plan_id=body.plan_id,
+        payment_method=body.payment_method, amount=body.amount, currency=body.currency,
+        transaction_ref=body.transaction_ref, admin_notes=body.notes, status="pending",
+    )
+    db.add(payment)
+    await db.commit()
+    await db.refresh(payment)
+    return payment
 
 
 @router.get("/pending", response_model=List[ManualPaymentResponse])
@@ -281,6 +364,18 @@ async def update_manual_payment_status(
                     notes=f"Pago Manual ({payment.payment_method}) aprobado — Ref: {payment.transaction_ref or 'N/A'}"
                 )
                 db.add(maint_pay)
+
+    if status_update.status == "approved":
+        add_notification(
+            db, payment.client_id, "Pago aprobado",
+            f"Confirmamos tu pago de {payment.amount:,.2f} {payment.currency}. ¡Gracias!", type="update",
+        )
+    else:
+        add_notification(
+            db, payment.client_id, "Pago rechazado",
+            f"No pudimos verificar tu pago de {payment.amount:,.2f} {payment.currency}. "
+            f"{status_update.admin_notes or 'Revisa el comprobante y vuelve a enviarlo.'}", type="update",
+        )
 
     try:
         await db.commit()

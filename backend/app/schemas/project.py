@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional
 
@@ -9,7 +9,7 @@ class ProjectBase(BaseModel):
     project_type: str = "website"
     status: str = "active"
     phase: str = "Planificación"
-    progress_pct: int = 0
+    progress_pct: int = Field(default=0, ge=0, le=100)
     estimated_weeks: Optional[int] = None
     remaining_weeks: Optional[int] = None
     updates_tags: Optional[str] = None
@@ -25,7 +25,7 @@ class ProjectUpdate(BaseModel):
     project_type: Optional[str] = None
     status: Optional[str] = None
     phase: Optional[str] = None
-    progress_pct: Optional[int] = None
+    progress_pct: Optional[int] = Field(default=None, ge=0, le=100)
     estimated_weeks: Optional[int] = None
     remaining_weeks: Optional[int] = None
     updates_tags: Optional[str] = None

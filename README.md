@@ -5,7 +5,7 @@ Este repositorio contiene el cliente web y la API para el Portal Client ErtWeb. 
 ## Requisitos Previos
 
 - **Node.js** (v18+)
-- **Python** (3.10+)
+- **Python** (3.10+; para generar PDFs en local hace falta Pango — en Docker ya viene)
 - **Docker** y **Docker Compose** (opcional para correr la base de datos de PostgreSQL)
 
 ---
@@ -75,3 +75,40 @@ El frontend utiliza React, Vite y TailwindCSS.
    npm run dev
    ```
    > El servidor estará disponible normalmente en `http://localhost:5173`.
+
+---
+
+## 4. Roles y cuentas
+
+| Rol | Entra a | Puede |
+|---|---|---|
+| `admin` | `/admin` | Todo: cuentas, proyectos, facturación, pagos, documentos, WhatsApp, pipeline y agenda |
+| `seller` (vendedor) | `/seller` | Bandeja de WhatsApp, activar/pausar la IA, pipeline de leads, agenda y crear la cuenta del cliente al cerrar una venta |
+| `client` | `/dashboard` | Su proyecto, documentos, facturas, pagos, agenda y mantenimiento |
+
+Las cuentas se crean desde **Admin → Cuentas → Nueva cuenta** (también se puede editar, cambiar la contraseña,
+desactivar o eliminar). El primer admin se crea al arrancar con `ADMIN_EMAIL` / `ADMIN_DEFAULT_PASSWORD` del `.env`.
+
+Para desarrollo local con datos de ejemplo: `SEED_DEMO_DATA=true` crea `client@example.com` con proyectos y facturas de prueba.
+**En producción debe quedar en `false`.**
+
+## 5. WhatsApp y n8n
+
+La conexión de la bandeja de WhatsApp con n8n (qué endpoint llama n8n y qué webhooks dispara el portal) está en
+[N8N_WHATSAPP.md](N8N_WHATSAPP.md). Todas las rutas de la API: [API_ROUTES.md](API_ROUTES.md).
+
+## 6. Tests
+
+```bash
+cd backend
+python -m pytest tests -q
+```
+
+Prueba el flujo completo (login → cuentas → proyecto y factura → portal del cliente → pago → WhatsApp → agenda)
+contra una base SQLite temporal y un n8n simulado; no necesita Postgres ni n8n.
+
+## 7. Despliegue
+
+- Copia `backend/.env.example` a `backend/.env` y `frontend/.env.example` a `frontend/.env`, y completa los valores.
+- Las migraciones corren solas al arrancar el contenedor (`alembic upgrade head`).
+- Los archivos subidos viven en el volumen `uploads_data`.

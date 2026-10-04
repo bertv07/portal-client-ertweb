@@ -71,8 +71,7 @@ El backend está preparado para conectarse con n8n en las siguientes acciones:
 |---|---|---|
 | **Cita Agendada** | `POST /meetings/schedule` | Crear evento en Google Calendar + Alerta Telegram |
 | **Documento Subido** | `POST /documents/upload` o `/{id}/upload` | Registrar en la base de datos + Alerta Telegram para aprobación |
-| **Factura Pagada** | `POST /invoices/{id}/pay` | Cambiar estatus a pagado + Alerta Telegram de cobro |
-| **Mantenimiento Renovado** | `POST /maintenance/{plan_id}/pay` | Extender suscripción + Alerta de renovación |
+| **Pago manual reportado** | `POST /manual-payments` → webhook `/webhook/manual-payment-submitted` | Alerta Telegram con el comprobante + aprobar/rechazar con `PUT /manual-payments/{id}/status` |
 
 ---
 
