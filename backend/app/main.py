@@ -1,16 +1,18 @@
 import logging
 import secrets
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
-from app.routers import notifications, auth, projects, invoices, documents, users, maintenance, meetings, payments, manual_payments, appointments, terms, whatsapp
+from app.routers import notifications, auth, projects, invoices, documents, users, maintenance, meetings, payments, manual_payments, appointments, terms, whatsapp, automation
 
 from sqlalchemy import select
 from app.core.database import SessionLocal
 from app.models.user import User
 from app.core.security import get_password_hash, verify_password
+from app.services.pdf import PdfUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +53,7 @@ app.include_router(manual_payments.router, prefix=settings.API_V1_STR)
 app.include_router(appointments.router, prefix=settings.API_V1_STR)
 app.include_router(terms.router, prefix=settings.API_V1_STR)
 app.include_router(whatsapp.router, prefix=settings.API_V1_STR)
+app.include_router(automation.router, prefix=settings.API_V1_STR)
 
 
 
@@ -298,6 +301,12 @@ async def startup_event():
             
             await db.commit()
 
+
+
+@app.exception_handler(PdfUnavailable)
+async def pdf_unavailable_handler(request: Request, exc: PdfUnavailable):
+    logger.error("PDF no disponible: %s", exc.__cause__ or exc)
+    return JSONResponse(status_code=503, content={"detail": str(exc)})
 
 
 @app.get("/health")

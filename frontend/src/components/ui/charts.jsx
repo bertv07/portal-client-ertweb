@@ -11,7 +11,7 @@ export function BarChart({ data, format = (v) => v, height = 168, highlight, emp
   const max = Math.max(...data.map((d) => d.value), 0);
 
   if (max === 0) {
-    return <div className="flex items-center justify-center text-xs text-gray-400" style={{ height }}>{emptyLabel}</div>;
+    return <div className="flex items-center justify-center text-xs text-gray-500" style={{ height }}>{emptyLabel}</div>;
   }
 
   return (
@@ -31,7 +31,7 @@ export function BarChart({ data, format = (v) => v, height = 168, highlight, emp
               className="relative flex-1 h-full flex items-end justify-center focus:outline-none group"
             >
               {active === i && (
-                <span className="absolute -top-1 -translate-y-full z-10 bg-gray-900 text-white text-[11px] font-semibold px-2 py-1 rounded-lg whitespace-nowrap pointer-events-none">
+                <span className="absolute -top-1 -translate-y-full z-10 bg-gray-900 text-white text-xs font-semibold px-2 py-1 rounded-lg whitespace-nowrap pointer-events-none">
                   {format(d.value)}
                 </span>
               )}
@@ -49,7 +49,7 @@ export function BarChart({ data, format = (v) => v, height = 168, highlight, emp
       </div>
       <div className="flex gap-2 mt-2 border-t border-gray-100 pt-2">
         {data.map((d) => (
-          <span key={d.label} className="flex-1 text-center text-[10px] font-medium text-gray-400 truncate">{d.label}</span>
+          <span key={d.label} className="flex-1 text-center text-[11px] font-medium text-gray-500 truncate">{d.label}</span>
         ))}
       </div>
     </div>
@@ -93,7 +93,7 @@ export function Gauge({ value, label, sub }) {
       <div className="-mt-12 text-center">
         <div className="text-3xl font-extrabold text-gray-900 tracking-tight tabular-nums">{pct}%</div>
         <div className="text-xs font-semibold text-gray-600 mt-0.5">{label}</div>
-        {sub && <div className="text-[11px] text-gray-400 mt-0.5">{sub}</div>}
+        {sub && <div className="text-xs text-gray-500 mt-0.5">{sub}</div>}
       </div>
     </div>
   );

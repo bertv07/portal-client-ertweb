@@ -3,7 +3,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { Send, CheckCircle2, Megaphone } from 'lucide-react';
 import api from '../../lib/axios';
 import { apiError } from '../../lib/format';
-import { Button, Card, ErrorText, Field, inputClass } from '../../components/ui';
+import { Button, Card, ErrorText, Field, inputClass, textareaClass } from '../../components/ui';
 
 const TYPES = { update: 'Actualización', milestone: 'Hito del proyecto', document: 'Documento', support: 'Soporte' };
 const EMPTY = { client_id: 'all', title: '', message: '', type: 'update' };
@@ -41,7 +41,7 @@ export default function AdminNotifications() {
             </Field>
           </div>
           <Field label="Título"><input required className={inputClass} value={form.title} onChange={set('title')} /></Field>
-          <Field label="Mensaje"><textarea required rows={4} className={`${inputClass} resize-none`} value={form.message} onChange={set('message')} /></Field>
+          <Field label="Mensaje"><textarea required rows={4} className={textareaClass} value={form.message} onChange={set('message')} /></Field>
           <ErrorText>{mutation.isError && apiError(mutation.error, 'No se pudo enviar')}</ErrorText>
           {mutation.isSuccess && (
             <p className="text-xs font-semibold text-emerald-700 bg-emerald-50 rounded-xl px-3 py-2 flex items-center gap-2">
@@ -53,7 +53,7 @@ export default function AdminNotifications() {
       </Card>
 
       <Card className="p-6 lg:col-span-2 self-start">
-        <div className="w-11 h-11 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center mb-3"><Megaphone className="w-5 h-5" /></div>
+        <div className="w-11 h-11 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center mb-3"><Megaphone className="w-5 h-5" /></div>
         <h2 className="font-bold text-gray-900 mb-1">Avisos a clientes</h2>
         <p className="text-sm text-gray-500 leading-relaxed">
           Lo que envíes aparece en la sección Notificaciones del portal del cliente. Además, el portal ya avisa solo cuando

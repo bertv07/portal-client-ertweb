@@ -4,7 +4,7 @@ import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js';
 import { CheckCircle2, QrCode, Landmark, ArrowLeft } from 'lucide-react';
 import api from '../../lib/axios';
 import { apiError, money } from '../../lib/format';
-import { Button, ErrorText, Field, Modal, Spinner, inputClass } from '../ui';
+import { Button, ErrorText, Field, Modal, LoadingBlock, inputClass } from '../ui';
 
 const PAYPAL_CLIENT_ID = import.meta.env.VITE_PAYPAL_CLIENT_ID;
 
@@ -41,7 +41,7 @@ function BinanceForm({ target, amount, currency, onDone }) {
     }
   };
 
-  if (isLoading) return <Spinner className="!py-8" />;
+  if (isLoading) return <LoadingBlock className="!py-8" />;
 
   if (!info?.binance_id && !info?.binance_email) {
     return <ErrorText>El pago por Binance no está disponible en este momento. Escríbenos y te ayudamos a completar el pago.</ErrorText>;
@@ -52,7 +52,7 @@ function BinanceForm({ target, amount, currency, onDone }) {
       <p className="text-xs text-gray-500">
         Envía <span className="font-bold text-gray-900">{amount} USDT</span> a esta cuenta y luego reporta el pago aquí. Lo verificamos y queda registrado.
       </p>
-      <div className="bg-brand-50/70 rounded-2xl p-4 border border-brand-100 flex flex-col gap-2 text-xs">
+      <div className="bg-brand-50/70 rounded-xl p-4 border border-brand-100 flex flex-col gap-2 text-xs">
         {info.binance_id && <div className="flex justify-between gap-3"><span className="text-gray-500">Binance Pay ID</span><span className="font-bold text-gray-900 select-all">{info.binance_id}</span></div>}
         {info.binance_email && <div className="flex justify-between gap-3"><span className="text-gray-500">Correo</span><span className="font-bold text-gray-900 select-all truncate">{info.binance_email}</span></div>}
         {info.binance_name && <div className="flex justify-between gap-3"><span className="text-gray-500">Titular</span><span className="font-bold text-gray-900">{info.binance_name}</span></div>}
@@ -118,7 +118,7 @@ export default function PaymentModal({ title, concept, amount, currency = 'USD',
       {method === '' && (
         <div className="flex flex-col gap-3">
           {PAYPAL_CLIENT_ID && (
-            <button onClick={() => setMethod('paypal')} className="flex items-center gap-3 border border-gray-200 hover:border-brand-300 hover:bg-brand-50/40 p-4 rounded-2xl text-left transition-colors">
+            <button onClick={() => setMethod('paypal')} className="flex items-center gap-3 border border-gray-200 hover:border-brand-300 hover:bg-brand-50/40 p-4 rounded-xl text-left transition-colors">
               <div className="p-2.5 bg-sky-50 rounded-xl"><Landmark className="w-5 h-5 text-sky-600" /></div>
               <div>
                 <div className="text-sm font-bold text-gray-900">PayPal o tarjeta</div>
@@ -126,7 +126,7 @@ export default function PaymentModal({ title, concept, amount, currency = 'USD',
               </div>
             </button>
           )}
-          <button onClick={() => setMethod('binance')} className="flex items-center gap-3 border border-gray-200 hover:border-brand-300 hover:bg-brand-50/40 p-4 rounded-2xl text-left transition-colors">
+          <button onClick={() => setMethod('binance')} className="flex items-center gap-3 border border-gray-200 hover:border-brand-300 hover:bg-brand-50/40 p-4 rounded-xl text-left transition-colors">
             <div className="p-2.5 bg-amber-50 rounded-xl"><QrCode className="w-5 h-5 text-amber-600" /></div>
             <div>
               <div className="text-sm font-bold text-gray-900">Binance Pay (USDT)</div>

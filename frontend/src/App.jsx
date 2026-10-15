@@ -3,6 +3,7 @@ import AppShell from './components/layout/AppShell';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import { MotionConfig } from 'motion/react';
 import { homeFor } from './lib/roles';
 
 const queryClient = new QueryClient({
@@ -29,6 +30,7 @@ import AdminDocuments from './pages/admin/AdminDocuments';
 import AdminMaintenance from './pages/admin/AdminMaintenance';
 import AdminNotifications from './pages/admin/AdminNotifications';
 import AdminPayments from './pages/admin/AdminPayments';
+import AdminAutomation from './pages/admin/AdminAutomation';
 
 // Staff Pages (admin y vendedor)
 import SellerDashboard from './pages/staff/SellerDashboard';
@@ -44,6 +46,7 @@ function HomeRedirect() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <MotionConfig reducedMotion="user">
       <AuthProvider>
         <BrowserRouter>
           <Routes>
@@ -79,6 +82,7 @@ function App() {
                 <Route path="notifications" element={<AdminNotifications />} />
                 <Route path="whatsapp" element={<WhatsAppInbox />} />
                 <Route path="pipeline" element={<Pipeline />} />
+                <Route path="automation" element={<AdminAutomation />} />
               </Route>
             </Route>
 
@@ -98,6 +102,7 @@ function App() {
           </Routes>
         </BrowserRouter>
       </AuthProvider>
+      </MotionConfig>
     </QueryClientProvider>
   );
 }

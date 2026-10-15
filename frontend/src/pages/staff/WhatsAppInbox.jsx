@@ -5,12 +5,14 @@ import {
   MessageCircle, Send, Bot, ArrowLeft, CalendarPlus, UserPlus, Plus, AlertCircle, RotateCw,
   CheckCircle2, Paperclip, Info, ExternalLink,
 } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import clsx from 'clsx';
+import { SPRING } from '../../lib/motion';
 import api from '../../lib/axios';
 import { apiError, clockTime, formatPhone, timeAgo, TIME_SLOTS } from '../../lib/format';
 import { STAGES, STAGE_MAP } from '../../lib/stages';
 import {
-  Avatar, Badge, Button, Card, EmptyState, ErrorText, Field, Modal, ModalActions, SearchInput, Spinner, Toggle, inputClass,
+  Avatar, Badge, Button, Card, EmptyState, ErrorText, Field, Modal, ModalActions, SearchInput, LoadingBlock, Toggle, inputClass, textareaClass, Segmented
 } from '../../components/ui';
 
 const convName = (c) => c?.contact_name || formatPhone(c?.phone);
@@ -97,7 +99,7 @@ function ScheduleModal({ conversation, onClose }) {
           </select>
         </Field>
         <Field label="Notas (opcional)">
-          <textarea rows={2} className={clsx(inputClass, 'resize-none')} value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} />
+          <textarea rows={2} className={textareaClass} value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} />
         </Field>
         <ErrorText>{mutation.isError && apiError(mutation.error)}</ErrorText>
         <ModalActions onCancel={onClose} submitLabel="Agendar" loading={mutation.isPending} />
@@ -172,12 +174,12 @@ function DetailsPanel({ conversation, globalAi, onUpdate, updating }) {
         {conversation.client_id && <Badge tone="green" dot className="mt-2">Cliente del portal</Badge>}
       </div>
 
-      <div className={clsx('rounded-2xl p-4 border', conversation.ai_enabled && globalAi ? 'bg-brand-50 border-brand-100' : 'bg-gray-50 border-gray-200')}>
+      <div className={clsx('rounded-xl p-4 border', conversation.ai_enabled && globalAi ? 'bg-brand-50 border-brand-100' : 'bg-gray-50 border-gray-200')}>
         <div className="flex items-center gap-3">
-          <Bot className={clsx('w-5 h-5 shrink-0', conversation.ai_enabled && globalAi ? 'text-brand-600' : 'text-gray-400')} />
+          <Bot className={clsx('w-5 h-5 shrink-0', conversation.ai_enabled && globalAi ? 'text-brand-600' : 'text-gray-500')} />
           <div className="flex-1 min-w-0">
             <div className="text-sm font-bold text-gray-900">IA en este chat</div>
-            <div className="text-[11px] text-gray-500 leading-snug">
+            <div className="text-xs text-gray-500 leading-snug">
               {!globalAi ? 'La IA está apagada para todos los chats.' : conversation.ai_enabled ? 'La IA responde automáticamente.' : 'Pausada: respondes tú.'}
             </div>
           </div>
@@ -201,7 +203,7 @@ function DetailsPanel({ conversation, globalAi, onUpdate, updating }) {
 
       <Field label="Notas internas" hint="Solo las ve el equipo. Se guardan al salir del campo.">
         <textarea
-          rows={4} className={clsx(inputClass, 'resize-none')} value={notes} placeholder="Qué necesita, presupuesto, próximos pasos..."
+          rows={4} className={textareaClass} value={notes} placeholder="Qué necesita, presupuesto, próximos pasos..."
           onChange={(e) => setNotes(e.target.value)}
           onBlur={() => notes !== (conversation.notes || '') && onUpdate({ notes })}
         />
@@ -224,7 +226,12 @@ function Bubble({ message, onRetry }) {
   const failed = message.status === 'failed';
   const byAi = message.sender === 'ai';
   return (
-    <div className={clsx('flex', out ? 'justify-end' : 'justify-start')}>
+    <motion.div
+      layout="position"
+      initial={{ opacity: 0, y: 10, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={SPRING.smooth}
+      style={{ transformOrigin: out ? 'bottom right' : 'bottom left' }}
+      className={clsx('flex', out ? 'justify-end' : 'justify-start')}
+    >
       <div className="max-w-[80%] sm:max-w-[70%]">
         <div
           className={clsx(
@@ -242,7 +249,7 @@ function Bubble({ message, onRetry }) {
           )}
           {message.text}
         </div>
-        <div className={clsx('flex items-center gap-1.5 mt-1 text-[10px] text-gray-400', out && 'justify-end')}>
+        <div className={clsx('flex items-center gap-1.5 mt-1 text-[11px] text-gray-500', out && 'justify-end')}>
           {byAi && <span className="inline-flex items-center gap-1 font-semibold text-brand-600"><Bot className="w-3 h-3" /> IA</span>}
           {out && !byAi && !failed && <span className="font-semibold">Tú / equipo</span>}
           {failed ? (
@@ -254,7 +261,7 @@ function Bubble({ message, onRetry }) {
           )}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -299,7 +306,7 @@ function Thread({ conversation, globalAi, onBack, onToggleDetails }) {
         <Avatar name={convName(conversation)} />
         <div className="flex-1 min-w-0">
           <div className="font-bold text-gray-900 text-sm truncate">{convName(conversation)}</div>
-          <div className="text-[11px] text-gray-500 truncate">{formatPhone(conversation.phone)}</div>
+          <div className="text-xs text-gray-500 truncate">{formatPhone(conversation.phone)}</div>
         </div>
         <Badge tone={aiActive ? 'brand' : 'gray'} dot>{aiActive ? 'IA activa' : 'IA pausada'}</Badge>
         <button onClick={onToggleDetails} aria-label="Detalles del chat" className="xl:hidden p-2 rounded-xl text-gray-500 hover:bg-gray-100">
@@ -308,10 +315,13 @@ function Thread({ conversation, globalAi, onBack, onToggleDetails }) {
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 flex flex-col gap-3 bg-brand-50/50">
-        {isLoading ? <Spinner /> : messages.length === 0 ? (
+        {isLoading ? <LoadingBlock /> : messages.length === 0 ? (
           <EmptyState icon={MessageCircle} title="Sin mensajes todavía">Escribe el primer mensaje para iniciar la conversación.</EmptyState>
         ) : (
-          messages.map((m) => <Bubble key={m.id} message={m} onRetry={(t) => sendMutation.mutate(t)} />)
+          // initial={false}: el historial aparece quieto; solo se animan los mensajes que llegan después
+          <AnimatePresence initial={false}>
+            {messages.map((m) => <Bubble key={m.id} message={m} onRetry={(t) => sendMutation.mutate(t)} />)}
+          </AnimatePresence>
         )}
         <div ref={bottomRef} />
       </div>
@@ -319,7 +329,7 @@ function Thread({ conversation, globalAi, onBack, onToggleDetails }) {
       <form onSubmit={submit} className="p-3 border-t border-brand-100/70">
         {sendMutation.isError && <div className="mb-2"><ErrorText>{apiError(sendMutation.error)}</ErrorText></div>}
         {aiActive && (
-          <p className="text-[11px] text-gray-500 mb-2 px-1">
+          <p className="text-xs text-gray-500 mb-2 px-1">
             La IA sigue activa en este chat. Si vas a atenderlo tú, pausa la IA para que no respondan los dos.
           </p>
         )}
@@ -330,9 +340,9 @@ function Thread({ conversation, globalAi, onBack, onToggleDetails }) {
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }}
             placeholder="Escribe un mensaje..."
-            className={clsx(inputClass, 'resize-none max-h-32 rounded-3xl')}
+            className={clsx(textareaClass, 'max-h-32 !py-2.5')}
           />
-          <Button type="submit" size="icon" className="!p-3 !rounded-full shrink-0" loading={sendMutation.isPending} disabled={!text.trim()} aria-label="Enviar">
+          <Button type="submit" size="icon" className="!h-11 !w-11 !rounded-full shrink-0" loading={sendMutation.isPending} disabled={!text.trim()} aria-label="Enviar">
             {!sendMutation.isPending && <Send className="w-4 h-4" />}
           </Button>
         </div>
@@ -395,16 +405,16 @@ export default function WhatsAppInbox() {
 
       {/* Interruptor general de la IA */}
       <Card className={clsx('px-5 py-3.5 flex items-center gap-3 shrink-0', selected && 'hidden lg:flex')}>
-        <div className={clsx('w-9 h-9 rounded-xl flex items-center justify-center shrink-0', globalAi ? 'bg-brand-50 text-brand-600' : 'bg-gray-100 text-gray-400')}>
+        <div className={clsx('w-9 h-9 rounded-xl flex items-center justify-center shrink-0', globalAi ? 'bg-brand-50 text-brand-600' : 'bg-gray-100 text-gray-500')}>
           <Bot className="w-5 h-5" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-bold text-gray-900">Asistente de IA {globalAi ? 'activo' : 'apagado'}</div>
-          <div className="text-[11px] text-gray-500 truncate">
+          <div className="text-xs text-gray-500 truncate">
             {globalAi ? 'Responde los chats que no tengas pausados.' : 'No responde ningún chat hasta que lo vuelvas a encender.'}
           </div>
         </div>
-        {globalMutation.isError && <span className="text-[11px] text-red-600 font-medium hidden sm:block">{apiError(globalMutation.error)}</span>}
+        {globalMutation.isError && <span className="text-xs text-red-600 font-medium hidden sm:block">{apiError(globalMutation.error)}</span>}
         <Toggle checked={globalAi} disabled={globalMutation.isPending || !settings} label="IA para todos los chats" onChange={(v) => globalMutation.mutate(v)} />
       </Card>
 
@@ -413,22 +423,16 @@ export default function WhatsAppInbox() {
         <div className={clsx('w-full lg:w-80 lg:border-r border-brand-100/70 flex-col min-h-0 shrink-0', selected ? 'hidden lg:flex' : 'flex')}>
           <div className="p-3 flex flex-col gap-2.5 border-b border-brand-100/70">
             <div className="flex gap-2">
-              <SearchInput value={search} onChange={setSearch} placeholder="Buscar nombre o número" />
-              <Button size="icon" className="!p-3 !rounded-full shrink-0" onClick={() => setShowNew(true)} aria-label="Nuevo chat"><Plus className="w-4 h-4" /></Button>
+              <SearchInput value={search} onChange={setSearch} placeholder="Buscar chat" />
+              <Button size="icon" className="!h-11 !w-11 shrink-0" onClick={() => setShowNew(true)} aria-label="Nuevo chat"><Plus className="w-4 h-4" /></Button>
             </div>
-            <div className="flex gap-1.5">
-              {[['all', 'Todos'], ['unread', 'Sin leer'], ['human', 'IA pausada']].map(([id, label]) => (
-                <button
-                  key={id} onClick={() => setFilter(id)}
-                  className={clsx('px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors', filter === id ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            <Segmented
+              size="sm" className="self-start !border-0 !bg-gray-100" value={filter} onChange={setFilter}
+              options={[{ id: 'all', label: 'Todos' }, { id: 'unread', label: 'Sin leer' }, { id: 'human', label: 'IA pausada' }]}
+            />
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto">
-            {isLoading ? <Spinner /> : isError ? (
+            {isLoading ? <LoadingBlock /> : isError ? (
               <div className="p-4"><ErrorText>{apiError(error)}</ErrorText></div>
             ) : visible.length === 0 ? (
               <EmptyState icon={MessageCircle} title={conversations.length ? 'Nada con ese filtro' : 'Sin chats todavía'}>
@@ -444,13 +448,13 @@ export default function WhatsAppInbox() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline justify-between gap-2">
                       <span className={clsx('text-sm truncate', c.unread_count ? 'font-bold text-gray-900' : 'font-semibold text-gray-800')}>{convName(c)}</span>
-                      <span className="text-[10px] text-gray-400 shrink-0">{timeAgo(c.last_message_at)}</span>
+                      <span className="text-[11px] text-gray-500 shrink-0">{timeAgo(c.last_message_at)}</span>
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className={clsx('text-xs truncate flex-1', c.unread_count ? 'text-gray-800 font-medium' : 'text-gray-500')}>{c.last_message_text || 'Sin mensajes'}</span>
                       {!c.ai_enabled && <Bot className="w-3.5 h-3.5 text-gray-300 shrink-0" aria-label="IA pausada" />}
                       {c.unread_count > 0 && (
-                        <span className="bg-brand-600 text-white text-[10px] font-bold min-w-5 h-5 px-1.5 rounded-full flex items-center justify-center shrink-0">{c.unread_count}</span>
+                        <span className="bg-brand-600 text-white text-[11px] font-bold min-w-5 h-5 px-1.5 rounded-full flex items-center justify-center shrink-0">{c.unread_count}</span>
                       )}
                     </div>
                     <div className="mt-1.5"><Badge tone={STAGE_MAP[c.stage]?.tone}>{STAGE_MAP[c.stage]?.label || c.stage}</Badge></div>

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Check, X, Image as ImageIcon, Wallet, FileText } from 'lucide-react';
 import api from '../../lib/axios';
 import { apiError, money } from '../../lib/format';
-import { Avatar, Badge, Button, Card, EmptyState, ErrorText, Field, Modal, ModalActions, Spinner, inputClass } from '../../components/ui';
+import { Avatar, Badge, Button, Card, EmptyState, ErrorText, Field, Modal, ModalActions, LoadingBlock, textareaClass, Segmented } from '../../components/ui';
 
 const STATUS = { pending: ['Por revisar', 'amber'], approved: ['Aprobado', 'green'], rejected: ['Rechazado', 'red'] };
 
@@ -41,20 +41,16 @@ export default function AdminPayments() {
   const visible = payments.filter((p) => filter === 'all' || p.status === filter);
   const isPdf = (url) => url?.toLowerCase().endsWith('.pdf');
 
-  if (isLoading) return <Spinner />;
+  if (isLoading) return <LoadingBlock />;
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex gap-1 bg-white border border-brand-100/70 p-1 rounded-full self-start">
-        {[['pending', 'Por revisar'], ['approved', 'Aprobados'], ['rejected', 'Rechazados'], ['all', 'Todos']].map(([id, label]) => (
-          <button
-            key={id} onClick={() => setFilter(id)}
-            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors ${filter === id ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}
-          >
-            {label} <span className="opacity-60 tabular-nums">{id === 'all' ? payments.length : payments.filter((p) => p.status === id).length}</span>
-          </button>
-        ))}
-      </div>
+      <Segmented
+        className="self-start" value={filter} onChange={setFilter}
+        options={[['pending', 'Por revisar'], ['approved', 'Aprobados'], ['rejected', 'Rechazados'], ['all', 'Todos']].map(([id, label]) => ({
+          id, label, count: id === 'all' ? payments.length : payments.filter((p) => p.status === id).length,
+        }))}
+      />
       <ErrorText>{mutation.isError && !rejecting && apiError(mutation.error)}</ErrorText>
 
       {visible.length === 0 ? (
@@ -76,7 +72,7 @@ export default function AdminPayments() {
                 <div className="text-sm text-gray-600 mt-1">
                   <span className="font-bold text-gray-900 tabular-nums">{money(p.amount, p.currency)}</span> · {p.payment_method} · {target(p)}
                 </div>
-                <div className="text-xs text-gray-400 mt-1">
+                <div className="text-xs text-gray-500 mt-1">
                   Ref: <span className="select-all font-mono">{p.transaction_ref || 'N/A'}</span> · {new Date(p.created_at).toLocaleString('es-VE')}
                 </div>
                 {p.admin_notes && <p className="text-xs text-gray-600 bg-gray-50 rounded-xl px-3 py-2 mt-2">Nota: {p.admin_notes}</p>}
@@ -106,7 +102,7 @@ export default function AdminPayments() {
 
       {proof && (
         <Modal title="Comprobante de pago" onClose={() => setProof(null)} size="xl">
-          <img src={proof} alt="Comprobante de pago" className="max-w-full max-h-[70vh] object-contain rounded-2xl mx-auto" />
+          <img src={proof} alt="Comprobante de pago" className="max-w-full max-h-[70vh] object-contain rounded-xl mx-auto" />
         </Modal>
       )}
 
@@ -114,7 +110,7 @@ export default function AdminPayments() {
         <Modal title="Rechazar pago" subtitle="El motivo le llega al cliente como notificación." onClose={() => setRejecting(null)}>
           <form onSubmit={(e) => { e.preventDefault(); mutation.mutate({ id: rejecting.id, status: 'rejected', admin_notes: notes }); }} className="flex flex-col gap-4">
             <Field label="Motivo del rechazo">
-              <textarea required rows={3} className={`${inputClass} resize-none`} placeholder="Ej. La referencia no coincide con el depósito o el monto es incorrecto." value={notes} onChange={(e) => setNotes(e.target.value)} />
+              <textarea required rows={3} className={textareaClass} placeholder="Ej. La referencia no coincide con el depósito o el monto es incorrecto." value={notes} onChange={(e) => setNotes(e.target.value)} />
             </Field>
             <ErrorText>{mutation.isError && apiError(mutation.error)}</ErrorText>
             <ModalActions onCancel={() => setRejecting(null)} submitLabel="Confirmar rechazo" loading={mutation.isPending} danger />

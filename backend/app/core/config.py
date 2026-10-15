@@ -54,6 +54,7 @@ class Settings(BaseSettings):
     N8N_WA_SEND_PATH: str = "/webhook/whatsapp-send"            # vendedor responde un chat
     N8N_WA_SCHEDULE_PATH: str = "/webhook/whatsapp-schedule"    # vendedor agenda una cita
     N8N_WA_AI_TOGGLE_PATH: str = "/webhook/whatsapp-ai-toggle"  # se activa/desactiva la IA
+    N8N_BOT_CONFIG_PATH: str = "/webhook/bot-config"            # interruptores del bot (GET lee, POST cambia)
 
     # Zona horaria de la agencia (para las fechas que se envían a n8n / Calendar)
     APP_TIMEZONE: str = "America/Caracas"

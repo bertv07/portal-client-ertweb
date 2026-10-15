@@ -22,8 +22,29 @@
   --color-accent-500: #a855f7;
   --color-accent-600: #9333ea;
 
+  /* Neutros teñidos hacia el morado de marca: sobre el fondo lavanda un gris
+     puro se ve sucio. gray-500 es el mínimo para texto (AA sobre blanco y brand-50). */
+  --color-gray-50: #faf9fb;
+  --color-gray-100: #f3f1f5;
+  --color-gray-200: #e6e2ea;
+  --color-gray-300: #d1cbd8;
+  --color-gray-400: #a39cac;
+  --color-gray-500: #6c6476;
+  --color-gray-600: #544d5d;
+  --color-gray-700: #3f3947;
+  --color-gray-800: #29242f;
+  --color-gray-900: #19151e;
+  --color-gray-950: #0f0c13;
+
   --font-sans: "Montserrat", "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
+
+  /* Elevación: dos capas (contacto + ambiente) teñidas con el morado más oscuro */
+  --shadow-card: 0 1px 2px rgb(36 16 48 / 0.05), 0 10px 24px -16px rgb(36 16 48 / 0.14);
+  --shadow-raised: 0 2px 4px rgb(36 16 48 / 0.06), 0 16px 32px -16px rgb(36 16 48 / 0.22);
+  --shadow-overlay: 0 4px 8px rgb(36 16 48 / 0.06), 0 32px 64px -24px rgb(36 16 48 / 0.36);
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @layer base {
@@ -31,11 +52,76 @@
     @apply bg-brand-50 text-gray-900 antialiased min-h-screen overflow-x-hidden;
   }
 
+  body {
+    font-feature-settings: "tnum" 0;
+    caret-color: var(--color-brand-600);
+    scrollbar-color: var(--color-brand-200) transparent;
+  }
+
   /* Por defecto, un hijo de flex/grid no se encoge por debajo del ancho de su
      contenido (min-width: auto), lo que empuja layouts completos fuera de
      pantalla en mobile cuando hay texto largo. Este reset lo permite. */
   * {
     min-width: 0;
+  }
+
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
+
+  ::selection {
+    background: var(--color-brand-200);
+    color: var(--color-brand-950);
+  }
+
+  /* Un solo anillo de foco para todo lo que se puede usar con teclado */
+  :where(a, button, [role="button"], [role="switch"], summary):focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-brand-200);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-brand-300);
+  }
+
+  /* El cursor de mano solo donde hay una acción */
+  button:not(:disabled), [role="switch"]:not(:disabled), select, summary, label[for] {
+    cursor: pointer;
+  }
+}
+
+/* Carga: bloque que late en vez de un spinner en medio del contenido */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.skeleton {
+  background: var(--color-brand-100);
+  border-radius: 0.5rem;
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+/* Quien pide menos movimiento conserva los cambios de estado (color, opacidad)
+   pero sin desplazamientos ni latidos. Los resortes de `motion` respetan lo
+   mismo vía <MotionConfig reducedMotion="user">. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+  .tabbar2-link, .tabbar2-icon {
+    transition: color 0.2s ease !important;
   }
 }
 
@@ -59,19 +145,19 @@
   align-items: center;
   justify-content: center;
   width: 2.75rem;
-  height: 2.5rem;
+  height: 2.75rem;
   border-top-left-radius: 999px;
   border-top-right-radius: 999px;
   background: #fff;
-  color: #9ca3af;
-  transition: width 0.35s ease, height 0.35s ease, transform 0.35s ease,
-    color 0.35s ease, box-shadow 0.35s ease, border-radius 0.35s ease;
+  color: var(--color-gray-500);
+  /* Solo transform, color y sombra: animar ancho/alto recalcula el layout en cada cuadro */
+  transition: transform 0.35s var(--ease-out-expo), color 0.2s ease, box-shadow 0.35s ease;
 }
 
 .tabbar2-icon {
   width: 1.25rem;
   height: 1.25rem;
-  transition: width 0.35s ease, height 0.35s ease;
+  transition: transform 0.35s var(--ease-out-expo);
 }
 
 .tabbar2-link.is-active {
@@ -80,13 +166,12 @@
   height: 3.5rem;
   border-radius: 999px;
   transform: translateY(-1.15rem);
-  color: #57286d;
+  color: var(--color-brand-600);
   box-shadow: 0 8px 20px rgba(87, 40, 109, 0.28), 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 
 .tabbar2-link.is-active .tabbar2-icon {
-  width: 1.5rem;
-  height: 1.5rem;
+  transform: scale(1.2);
 }
 
 .tabbar2-link.is-active::before,

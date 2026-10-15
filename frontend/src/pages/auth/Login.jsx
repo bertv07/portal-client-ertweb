@@ -1,22 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'motion/react';
-import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { homeFor } from '../../lib/roles';
+import { EASE_OUT } from '../../lib/motion';
+import { Button, ErrorText, Field, inputClass } from '../../components/ui';
+import ertLogo from '../../assets/ert-logo.png';
 import ertLogoWhite from '../../assets/ert-logo-white.png';
-
-const EASE_OUT = [0.16, 1, 0.3, 1]; // expo.out
-
-const container = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.09, delayChildren: 0.1 } },
-};
-
-const item = {
-  hidden: { opacity: 0, y: 18 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: EASE_OUT } },
-};
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -64,62 +55,51 @@ export default function Login() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#0d0d0d] flex items-center justify-center px-4 py-10 font-sans">
-      {/* Fondo: glow radial morado, igual espíritu que el hero de ertweb.com */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-32 -left-24 w-[26rem] h-[26rem] rounded-full bg-brand-600/30 blur-[100px]" />
-        <div className="absolute -bottom-32 -right-16 w-[24rem] h-[24rem] rounded-full bg-accent-500/20 blur-[110px]" />
-      </div>
+    <div className="min-h-dvh grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] bg-white">
+      {/* Panel de marca: morado sólido, la frase de ertweb y nada más */}
+      <aside className="hidden lg:flex flex-col justify-between bg-brand-900 text-white p-12 xl:p-16">
+        <img src={ertLogoWhite} alt="ertweb" className="h-9 w-auto self-start" />
+        <div>
+          <p className="text-[38px] xl:text-[46px] leading-[1.08] font-extrabold tracking-tight">
+            Diseño que piensa.<br />Código que siente.
+          </p>
+          <p className="mt-6 text-base text-brand-200 max-w-[38ch] leading-relaxed">
+            Sigue el avance de tu proyecto, tus facturas y tus documentos en un solo lugar.
+          </p>
+        </div>
+        <p className="text-sm text-brand-300">ertweb · Automatizaciones y desarrollo web</p>
+      </aside>
 
-      <motion.div
-        variants={container}
-        initial="hidden"
-        animate="show"
-        className="relative w-full max-w-sm"
-      >
-        {/* Marca */}
-        <motion.div variants={item} className="flex flex-col items-center mb-8 text-center">
-          <img src={ertLogoWhite} alt="ertweb" className="h-10 w-auto mb-5" />
-          <h1 className="text-2xl font-extrabold text-white tracking-tight">Portal ErtWeb</h1>
-          <p className="mt-1.5 text-sm text-white/40">Diseño que piensa. Código que siente.</p>
-        </motion.div>
-
-        {/* Card */}
+      <main className="flex items-center justify-center px-6 py-12">
         <motion.div
-          variants={item}
-          className="bg-white/[0.04] backdrop-blur-xl border border-white/10 rounded-[28px] p-7 shadow-2xl shadow-black/40"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, ease: EASE_OUT }}
+          className="w-full max-w-[380px]"
         >
-          <form className="space-y-5" onSubmit={handleSubmit} noValidate>
-            <div className="space-y-1.5">
-              <label htmlFor="email" className="block text-xs font-semibold text-white/60 uppercase tracking-wider">
-                Correo electrónico
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
-                <input
-                  ref={emailRef}
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  disabled={isLoading}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="tu@email.com"
-                  className="w-full bg-transparent border border-white/10 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-white placeholder-white/25 transition-colors focus:outline-none focus:border-brand-400 disabled:opacity-50"
-                />
-              </div>
-            </div>
+          <img src={ertLogo} alt="ertweb" className="h-8 w-auto mb-10 lg:hidden" />
+          <h1 className="text-[28px] leading-tight font-extrabold text-gray-900 tracking-tight">Inicia sesión</h1>
+          <p className="mt-2 text-[15px] text-gray-500">Entra con el correo y la contraseña que te dimos.</p>
 
-            <div className="space-y-1.5">
-              <label htmlFor="password" className="block text-xs font-semibold text-white/60 uppercase tracking-wider">
-                Contraseña
-              </label>
+          <form className="mt-8 flex flex-col gap-5" onSubmit={handleSubmit} noValidate>
+            <Field label="Correo electrónico">
+              <input
+                ref={emailRef}
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                disabled={isLoading}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="tu@correo.com"
+                className={`${inputClass} !h-12`}
+              />
+            </Field>
+
+            <Field label="Contraseña">
               <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
                 <input
-                  id="password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
@@ -127,56 +107,37 @@ export default function Login() {
                   disabled={isLoading}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-transparent border border-white/10 rounded-xl pl-10 pr-10 py-2.5 text-sm text-white placeholder-white/25 transition-colors focus:outline-none focus:border-brand-400 disabled:opacity-50"
+                  className={`${inputClass} !h-12 pr-12`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  tabIndex={-1}
                   aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/70 transition-colors"
+                  aria-pressed={showPassword}
+                  className="absolute right-1 top-1 h-10 w-10 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? <EyeOff className="w-[18px] h-[18px]" /> : <Eye className="w-[18px] h-[18px]" />}
                 </button>
               </div>
-            </div>
+            </Field>
 
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: -6 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-2 text-red-300 text-xs font-medium bg-red-500/10 border border-red-500/20 px-3.5 py-2.5 rounded-xl"
-              >
-                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                {error}
-              </motion.div>
-            )}
+            <ErrorText>{error}</ErrorText>
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="group w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white bg-brand-600 transition-all duration-300 hover:bg-brand-500 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-brand-600/40 disabled:opacity-60 disabled:pointer-events-none"
-            >
-              {isLoading ? (
+            <Button type="submit" loading={isLoading} className="!h-12 mt-1 group">
+              {isLoading ? 'Entrando...' : (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Iniciando sesión...
-                </>
-              ) : (
-                <>
-                  Iniciar sesión
-                  <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                  Entrar
+                  <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5" />
                 </>
               )}
-            </button>
+            </Button>
           </form>
-        </motion.div>
 
-        <motion.p variants={item} className="mt-6 text-center text-xs text-white/25">
-          ErtWeb &middot; Clientes y equipo
-        </motion.p>
-      </motion.div>
+          <p className="mt-8 text-sm text-gray-500 leading-relaxed">
+            ¿No recuerdas tu contraseña? Escríbenos y te generamos una nueva.
+          </p>
+        </motion.div>
+      </main>
     </div>
   );
 }

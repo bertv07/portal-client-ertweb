@@ -61,6 +61,8 @@ POST /whatsapp/n8n/messages
 { "phone": "...", "text": "<lo enviado>", "direction": "out", "sender": "ai", "wa_message_id": "cw-<id que devolvió Chatwoot>" }
 ```
 
+El flujo del formulario web (`Webhook` → `AI Agent` → `HTTP Request` por Evolution API) también le escribe al cliente: repórtalo igual, con el teléfono normalizado y `"name"` = el nombre del formulario, para que ese lead aparezca en la bandeja desde el primer mensaje.
+
 ### B3. Mensajes que un humano escribe directo en Chatwoot
 
 Hoy `Filtrar Eventos` solo deja pasar `incoming`. Agrega una rama para `message_type = outgoing` y `private = false`: espera 5 segundos y repórtalo con `"direction": "out", "sender": "agent", "wa_message_id": "cw-<body.id>"`. El portal descarta duplicados por `wa_message_id`, así los mensajes del bot y del portal (que ya se reportaron con ese mismo id) no se repiten. Esta rama no debe llegar nunca a la cola ni a la IA.
@@ -108,6 +110,15 @@ PUT /whatsapp/n8n/ai-status
 - Responde 200 con `{ "meeting_link": "<link de Meet>" }` (el portal lo guarda en la cita).
 - La cita ya quedó guardada en el portal: **no** vuelvas a crearla con `POST /appointments/`.
 - Envía al cliente por WhatsApp la confirmación con fecha, hora y link, y repórtala según B2.
+
+### B7. Reuniones que pide el cliente desde su portal
+
+Ahora quedan **por confirmar** hasta que el equipo las acepta. Son dos webhooks distintos:
+
+- `POST /webhook/meeting-requested` — el cliente acaba de pedir la reunión. Payload: `{ event: "meeting_requested", appointment_id, client_id, client_name, client_email, meeting_date, time_slot, topic }`. **Solo avisa al jefe** (correo o WhatsApp) de que hay una reunión por confirmar en el portal. No crees nada en el calendario.
+- `POST /webhook/schedule-meeting` — el equipo la confirmó. Payload: `{ event: "meeting_confirmed", appointment_id, client_id, client_name, client_email, client_phone, meeting_date, time_slot, duration_minutes, topic, timezone }`. Aquí sí crea el evento en Google Calendar con Meet y responde `{ "meeting_link": "..." }`.
+
+Las citas del portal tienen ahora el estado `pending`. En `Cron Recordatorio Citas` y en el resumen diario sigue contando solo las `scheduled`, y agrega al resumen la línea "Reuniones por confirmar: N".
 
 ---
 

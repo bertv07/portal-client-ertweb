@@ -4,13 +4,14 @@ import { useQuery } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   LayoutDashboard, Users, FolderKanban, Wallet, FileText, Wrench, Bell, LogOut, Menu, X,
-  CalendarCheck, MessageCircle, KanbanSquare, ReceiptText, KeyRound, ChevronDown, Home, Megaphone,
+  CalendarCheck, MessageCircle, KanbanSquare, ReceiptText, KeyRound, ChevronDown, Home, Megaphone, SlidersHorizontal,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../../context/AuthContext';
 import { ROLE_LABELS } from '../../lib/roles';
 import api from '../../lib/axios';
 import { Avatar } from '../ui';
+import { SPRING } from '../../lib/motion';
 import PageTransition from './PageTransition';
 import BottomNav from './BottomNav';
 import ChangePasswordModal from '../auth/ChangePasswordModal';
@@ -27,6 +28,7 @@ const NAV = {
       { path: '/admin/whatsapp', icon: MessageCircle, label: 'WhatsApp', subtitle: 'Chats, IA y respuestas', badge: 'wa' },
       { path: '/admin/pipeline', icon: KanbanSquare, label: 'Pipeline', subtitle: 'Leads por etapa de venta' },
       { path: '/admin/appointments', icon: CalendarCheck, label: 'Agenda', subtitle: 'Citas con clientes y leads' },
+      { path: '/admin/automation', icon: SlidersHorizontal, label: 'Automatización', subtitle: 'Qué hace el bot por su cuenta' },
     ] },
     { section: 'Finanzas', items: [
       { path: '/admin/invoices', icon: ReceiptText, label: 'Facturación', subtitle: 'Facturas y recibos' },
@@ -90,12 +92,12 @@ function useBadges(role) {
   };
 }
 
-function NavList({ sections, badges, onNavigate }) {
+function NavList({ sections, badges, onNavigate, layoutId }) {
   return (
-    <nav className="flex-1 overflow-y-auto px-3 py-2">
+    <nav className="flex-1 overflow-y-auto px-3 py-2" aria-label="Principal">
       {sections.map((group) => (
-        <div key={group.section} className="mb-5">
-          <div className="text-[10px] uppercase font-bold tracking-widest text-gray-400 px-3 mb-2">{group.section}</div>
+        <div key={group.section} className="mb-6">
+          {sections.length > 1 && <div className="text-xs font-semibold text-gray-500 px-3 mb-1.5">{group.section}</div>}
           <div className="flex flex-col gap-0.5">
             {group.items.map((item) => {
               const count = item.badge ? badges[item.badge] : 0;
@@ -105,16 +107,18 @@ function NavList({ sections, badges, onNavigate }) {
                   to={item.path}
                   onClick={onNavigate}
                   className={({ isActive }) => clsx(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-2xl text-sm font-medium transition-colors group',
-                    isActive ? 'bg-brand-600 text-white shadow-sm shadow-brand-600/25' : 'text-gray-600 hover:bg-brand-50 hover:text-brand-800',
+                    'relative flex items-center gap-3 px-3 h-10 rounded-lg text-sm transition-colors duration-150 group',
+                    isActive ? 'text-white font-semibold' : 'text-gray-700 font-medium hover:bg-brand-50 hover:text-brand-800',
                   )}
                 >
                   {({ isActive }) => (
                     <>
-                      <item.icon className={clsx('w-[18px] h-[18px] shrink-0', isActive ? 'text-white' : 'text-gray-400 group-hover:text-brand-600')} />
-                      <span className="flex-1 truncate">{item.label}</span>
+                      {/* El fondo del ítem activo se desliza al que elijas */}
+                      {isActive && <motion.span layoutId={layoutId} transition={SPRING.smooth} className="absolute inset-0 bg-brand-600 rounded-lg shadow-[0_1px_2px_rgb(36_16_48/0.3)]" />}
+                      <item.icon className={clsx('relative w-[18px] h-[18px] shrink-0', isActive ? 'text-white' : 'text-gray-500 group-hover:text-brand-600')} strokeWidth={isActive ? 2.2 : 1.9} />
+                      <span className="relative flex-1 truncate">{item.label}</span>
                       {count > 0 && (
-                        <span className={clsx('text-[10px] font-bold min-w-5 h-5 px-1.5 rounded-full flex items-center justify-center', isActive ? 'bg-white text-brand-700' : 'bg-brand-600 text-white')}>
+                        <span className={clsx('relative text-[11px] font-bold min-w-5 h-5 px-1.5 rounded-full flex items-center justify-center tabular-nums', isActive ? 'bg-white text-brand-700' : 'bg-brand-600 text-white')}>
                           {count > 99 ? '99+' : count}
                         </span>
                       )}
@@ -147,29 +151,37 @@ function UserMenu({ user, onChangePassword, onLogout }) {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="flex items-center gap-2.5 bg-white border border-brand-100/70 rounded-full pl-1.5 pr-3 py-1.5 hover:border-brand-300 transition-colors"
+        className="flex items-center gap-2.5 h-11 bg-white border border-brand-100/80 rounded-full pl-1.5 pr-3 hover:border-brand-300 transition-colors"
       >
         <Avatar name={user?.name} size="sm" tone="solid" />
         <span className="hidden sm:block text-left leading-tight max-w-[150px]">
           <span className="block text-xs font-bold text-gray-900 truncate">{user?.name}</span>
-          <span className="block text-[10px] text-gray-500 truncate">{ROLE_LABELS[user?.role] || user?.role}</span>
+          <span className="block text-[11px] text-gray-500 truncate">{ROLE_LABELS[user?.role] || user?.role}</span>
         </span>
-        <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+        <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
       </button>
+      <AnimatePresence>
       {open && (
-        <div role="menu" className="absolute right-0 mt-2 w-56 bg-white border border-brand-100 rounded-2xl shadow-xl shadow-brand-900/10 p-1.5 z-50">
+        <motion.div
+          role="menu"
+          initial={{ opacity: 0, scale: 0.94, y: -6 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.1 } }} transition={SPRING.overlay}
+          style={{ transformOrigin: 'top right' }}
+          className="absolute right-0 mt-2 w-60 bg-white border border-brand-100 rounded-xl shadow-raised p-1.5 z-50"
+        >
           <div className="px-3 py-2 border-b border-gray-100 mb-1">
             <div className="text-xs font-bold text-gray-900 truncate">{user?.name}</div>
-            <div className="text-[11px] text-gray-500 truncate">{user?.email}</div>
+            <div className="text-xs text-gray-500 truncate">{user?.email}</div>
           </div>
           <button role="menuitem" onClick={() => { setOpen(false); onChangePassword(); }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-gray-700 hover:bg-brand-50">
-            <KeyRound className="w-4 h-4 text-gray-400" /> Cambiar contraseña
+            <KeyRound className="w-4 h-4 text-gray-500" /> Cambiar contraseña
           </button>
           <button role="menuitem" onClick={onLogout} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-red-600 hover:bg-red-50">
             <LogOut className="w-4 h-4" /> Cerrar sesión
           </button>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -197,10 +209,10 @@ export default function AppShell() {
   };
 
   const brand = (
-    <div className="px-6 pt-7 pb-5">
+    <div className="px-6 pt-6 pb-5">
       <img src={ertLogo} alt="ertweb" className="h-7 w-auto" />
-      <div className="mt-2 text-[10px] text-brand-600 font-semibold tracking-wide uppercase">
-        {isClient ? 'Portal de clientes' : role === 'seller' ? 'Panel de ventas' : 'Panel admin'}
+      <div className="mt-1.5 text-xs text-gray-500 font-medium">
+        {isClient ? 'Portal de clientes' : role === 'seller' ? 'Panel de ventas' : 'Panel de administración'}
       </div>
     </div>
   );
@@ -208,11 +220,11 @@ export default function AppShell() {
   return (
     <div className="min-h-screen bg-brand-50 flex">
       {/* Sidebar — desktop */}
-      <aside className="hidden lg:flex flex-col w-64 fixed inset-y-0 left-0 z-40 bg-white border-r border-brand-100/70">
+      <aside className="hidden lg:flex flex-col w-64 fixed inset-y-0 left-0 z-40 bg-white border-r border-brand-100/80">
         {brand}
-        <NavList sections={sections} badges={badges} />
+        <NavList sections={sections} badges={badges} layoutId="nav-desktop" />
         <div className="p-3 border-t border-brand-100/70">
-          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors">
+          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 h-10 rounded-lg text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-700 transition-colors">
             <LogOut className="w-[18px] h-[18px]" /> Cerrar sesión
           </button>
         </div>
@@ -228,48 +240,48 @@ export default function AppShell() {
               className="fixed inset-0 bg-brand-950/50 z-[60] lg:hidden"
             />
             <motion.aside
-              initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+              initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%', transition: { duration: 0.18 } }} transition={SPRING.overlay}
               className="fixed inset-y-0 left-0 w-[82%] max-w-xs bg-white z-[70] flex flex-col lg:hidden"
             >
               <div className="flex items-start justify-between pr-4">
                 {brand}
-                <button onClick={() => setDrawerOpen(false)} aria-label="Cerrar menú" className="mt-6 p-2 rounded-xl text-gray-400 hover:bg-gray-100">
+                <button onClick={() => setDrawerOpen(false)} aria-label="Cerrar menú" className="mt-6 p-2 rounded-xl text-gray-500 hover:bg-gray-100">
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <NavList sections={sections} badges={badges} onNavigate={() => setDrawerOpen(false)} />
+              <NavList sections={sections} badges={badges} layoutId="nav-drawer" onNavigate={() => setDrawerOpen(false)} />
             </motion.aside>
           </>
         )}
       </AnimatePresence>
 
       <div className="flex-1 lg:ml-64 flex flex-col min-w-0">
-        <header className="sticky top-0 z-30 bg-brand-50/85 backdrop-blur-md px-4 lg:px-8 py-4 flex items-center gap-3">
+        <header className="sticky top-0 z-30 bg-brand-50/90 backdrop-blur-sm px-4 lg:px-10 pt-6 pb-5 flex items-center gap-3">
           {!isClient && (
-            <button onClick={() => setDrawerOpen(true)} aria-label="Abrir menú" className="lg:hidden p-2.5 rounded-2xl bg-white border border-brand-100/70 text-gray-600">
+            <button onClick={() => setDrawerOpen(true)} aria-label="Abrir menú" className="lg:hidden h-11 w-11 flex items-center justify-center rounded-xl bg-white border border-brand-100/80 text-gray-700">
               <Menu className="w-5 h-5" />
             </button>
           )}
           <div className="flex-1 min-w-0">
-            <div className="text-[11px] text-gray-500 first-letter:uppercase truncate">{isHome ? today : current?.subtitle || today}</div>
-            <h1 className="text-xl lg:text-2xl font-extrabold text-gray-900 tracking-tight truncate">
-              {isHome ? `${greeting()}, ${firstName}` : current?.label || 'Portal'}
+            <h1 className="text-[22px] lg:text-[26px] leading-tight font-extrabold text-gray-900 tracking-tight truncate">
+              {isHome ? <><span className="sm:hidden">Hola, {firstName}</span><span className="max-sm:hidden">{greeting()}, {firstName}</span></> : current?.label || 'Portal'}
             </h1>
+            <p className="text-[13px] text-gray-500 first-letter:uppercase truncate mt-0.5">{isHome ? today : current?.subtitle || today}</p>
           </div>
           {isClient && (
             <button
               onClick={() => navigate('/notifications')}
               aria-label="Notificaciones"
-              className="relative p-2.5 rounded-full bg-white border border-brand-100/70 text-gray-600 hover:text-brand-700 hover:border-brand-300 transition-colors"
+              className="relative h-11 w-11 flex items-center justify-center rounded-full bg-white border border-brand-100/80 text-gray-700 hover:text-brand-700 hover:border-brand-300 transition-colors"
             >
               <Bell className="w-[18px] h-[18px]" />
-              {badges.notifications > 0 && <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />}
+              {badges.notifications > 0 && <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />}
             </button>
           )}
           <UserMenu user={user} onChangePassword={() => setShowPassword(true)} onLogout={handleLogout} />
         </header>
 
-        <main className={clsx('flex-1 w-full px-4 lg:px-8 pb-10 mx-auto max-w-[1400px]', isClient && 'pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-10')}>
+        <main className={clsx('flex-1 w-full px-4 lg:px-10 pb-12 mx-auto max-w-[1440px]', isClient && 'pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-10')}>
           <PageTransition />
         </main>
 

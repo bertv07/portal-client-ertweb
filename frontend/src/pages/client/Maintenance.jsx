@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Wrench, CheckCircle2, Clock } from 'lucide-react';
 import api from '../../lib/axios';
 import { daysUntil, money, shortDate } from '../../lib/format';
-import { Badge, Button, Card, CardTitle, EmptyState, Spinner } from '../../components/ui';
+import { Badge, Button, Card, CardTitle, EmptyState, LoadingBlock } from '../../components/ui';
 import PaymentModal from '../../components/payments/PaymentModal';
 
 const parseTasks = (json) => {
@@ -18,7 +18,7 @@ export default function Maintenance() {
   const { data: payments = [] } = useQuery({ queryKey: ['my-maintenance-payments'], queryFn: () => api.get('/maintenance/me/payments').then((r) => r.data) });
   const { data: manualPayments = [] } = useQuery({ queryKey: ['my-manual-payments'], queryFn: () => api.get('/manual-payments/me').then((r) => r.data) });
 
-  if (isLoading) return <Spinner />;
+  if (isLoading) return <LoadingBlock />;
 
   if (plans.length === 0) {
     return (
@@ -67,7 +67,7 @@ export default function Maintenance() {
                 </div>
               </div>
 
-              <div className="bg-brand-50/70 rounded-3xl p-5 md:w-72 shrink-0">
+              <div className="bg-brand-50/70 rounded-2xl p-5 md:w-72 shrink-0">
                 <div className="text-xs font-semibold text-gray-500">Próximo pago</div>
                 <div className="text-3xl font-extrabold text-gray-900 tracking-tight tabular-nums mt-1">
                   {days === null ? '—' : overdue ? 'Vencido' : days === 0 ? 'Hoy' : `${days} día${days === 1 ? '' : 's'}`}

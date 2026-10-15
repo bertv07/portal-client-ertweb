@@ -35,3 +35,6 @@ coverage/
 # Logs
 logs/
 *.log
+
+# Archivos subidos en pruebas locales (en producción viven en el volumen uploads_data)
+backend/uploads/

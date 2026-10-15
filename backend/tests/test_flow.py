@@ -16,15 +16,30 @@ import pytest
 N8N_KEY = "test-n8n-key"
 received: list[tuple[str, dict, str | None]] = []  # (path, body, api key recibida)
 n8n_up = {"value": True}
+bot_flags = {"ia_global": True, "followup_leads": "true", "resumen_diario": False}
 
 
 class FakeN8n(BaseHTTPRequestHandler):
+    def do_GET(self):
+        received.append((self.path, {}, self.headers.get("X-N8N-API-Key")))
+        if not n8n_up["value"]:
+            self.send_response(500); self.end_headers(); return
+        data = json.dumps({"ok": True, "flags": bot_flags, "ignoradas": []}).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
         received.append((self.path, body, self.headers.get("X-N8N-API-Key")))
         if not n8n_up["value"]:
             self.send_response(500); self.end_headers(); return
         out = {"ok": True}
+        if self.path.endswith("bot-config"):
+            bot_flags.update(body.get("flags") or {})
+            out["flags"] = bot_flags
         if self.path.endswith("whatsapp-schedule"):
             out["meeting_link"] = "https://meet.google.com/abc-defg-hij"
         data = json.dumps(out).encode()
@@ -239,15 +254,41 @@ def test_sale_to_client_portal(client):
 
 
 def test_client_schedules_meeting(client):
-    c = state["client"]
+    c, a, s_ = state["client"], state["admin"], state["seller"]
     received.clear()
     r = client.post("/api/v1/meetings/schedule", headers=c, json={"meeting_date": "2099-01-15", "time_slot": "10:00 AM", "topic": "Revisión"})
-    assert r.status_code == 201 and r.json()["n8n_status"] == "success"
-    assert received[0][0] == "/webhook/schedule-meeting" and received[0][2] == N8N_KEY
+    # Lo que pide el cliente queda POR CONFIRMAR: todavía no se crea nada en el calendario
+    assert r.status_code == 201 and r.json()["status"] == "pending"
+    appt_id = r.json()["appointment_id"]
+    assert [p for p, _, _ in received] == ["/webhook/meeting-requested"] and received[0][2] == N8N_KEY
+    # El horario queda apartado mientras tanto
     assert client.post("/api/v1/meetings/schedule", headers=c, json={"meeting_date": "2099-01-15", "time_slot": "10:00 AM", "topic": "Otra"}).status_code == 409
     assert client.post("/api/v1/meetings/schedule", headers=c, json={"meeting_date": "2001-01-15", "time_slot": "10:00 AM", "topic": "Pasado"}).status_code == 400
     assert client.get("/api/v1/meetings/taken-slots?meeting_date=2099-01-15", headers=c).json() == {"taken": ["10:00 AM"]}
-    assert len(client.get("/api/v1/appointments/me", headers=c).json()) == 1
+    assert client.get("/api/v1/appointments/me", headers=c).json()[0]["status"] == "pending"
+    # El cliente no puede confirmarse su propia reunión
+    assert client.put(f"/api/v1/appointments/{appt_id}", headers=c, json={"status": "scheduled"}).status_code == 403
+
+    # El vendedor la confirma → evento en el calendario + link + aviso al cliente
+    client.post("/api/v1/notifications/read-all", headers=c)
+    received.clear()
+    r = client.put(f"/api/v1/appointments/{appt_id}", headers=s_, json={"status": "scheduled"})
+    assert r.status_code == 200 and r.json()["status"] == "scheduled"
+    listed = next(x for x in client.get("/api/v1/appointments/", headers=s_).json() if x["id"] == appt_id)
+    assert listed["client_name"] == "Carla Cliente"  # el vendedor ve con quién es, sin acceso a Cuentas
+    path, body, _ = received[0]
+    assert path == "/webhook/schedule-meeting" and body["event"] == "meeting_confirmed" and body["client_email"] == "carla@test.com"
+    assert [n["title"] for n in client.get("/api/v1/notifications/", headers=c).json()][0] == "Reunión confirmada"
+    # Editarla después no vuelve a disparar el calendario
+    received.clear()
+    client.put(f"/api/v1/appointments/{appt_id}", headers=a, json={"notes": "Llevar propuesta"})
+    assert received == []
+
+    # Otra solicitud que el equipo rechaza: el horario se libera y el cliente se entera
+    r = client.post("/api/v1/meetings/schedule", headers=c, json={"meeting_date": "2099-01-16", "time_slot": "09:00 AM", "topic": "Dudas"})
+    assert client.put(f"/api/v1/appointments/{r.json()['appointment_id']}", headers=a, json={"status": "cancelled"}).status_code == 200
+    assert client.get("/api/v1/meetings/taken-slots?meeting_date=2099-01-16", headers=c).json() == {"taken": []}
+    assert client.get("/api/v1/notifications/", headers=c).json()[0]["title"] == "No pudimos confirmar tu reunión"
 
 
 def test_whatsapp_inbox(client):
@@ -338,6 +379,32 @@ def test_whatsapp_inbox(client):
     luis = login(client, "luis@test.com", "Luis12345")
     assert client.get("/api/v1/projects/me", headers=luis).json() == []
     state["conv_id"], state["luis_id"] = conv_id, r.json()["id"]
+
+
+def test_bot_switches(client):
+    s, a = state["seller"], state["admin"]
+    wa, url = "/api/v1/whatsapp", "/api/v1/automation/flags"
+    assert client.get(url, headers=s).status_code == 403  # solo el admin
+
+    received.clear()
+    r = client.get(url, headers=a)
+    assert r.status_code == 200 and r.json()["flags"] == {"ia_global": True, "followup_leads": True, "resumen_diario": False}
+    assert received[0][0] == "/webhook/bot-config" and received[0][2] == N8N_KEY
+
+    # Apagar la IA desde aquí es lo mismo que el interruptor general de la bandeja
+    received.clear()
+    r = client.put(url, headers=a, json={"flags": {"ia_global": False, "followup_leads": False}})
+    assert r.status_code == 200 and r.json()["flags"]["ia_global"] is False and r.json()["flags"]["followup_leads"] is False
+    assert received[0][1]["flags"] == {"ia_global": False, "followup_leads": False}
+    assert client.get(f"{wa}/settings", headers=s).json()["ai_enabled"] is False
+    client.put(url, headers=a, json={"flags": {"ia_global": True}})
+    assert client.get(f"{wa}/settings", headers=s).json()["ai_enabled"] is True
+
+    assert client.put(url, headers=a, json={"flags": {"fusible": False}}).status_code == 400
+    n8n_up["value"] = False
+    assert client.get(url, headers=a).status_code == 502
+    assert client.put(url, headers=a, json={"flags": {"resumen_diario": True}}).status_code == 502
+    n8n_up["value"] = True
 
 
 def test_staff_appointments(client):

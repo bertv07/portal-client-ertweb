@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { FileText, Upload, Trash2, ExternalLink, FolderOpen } from 'lucide-react';
 import api from '../../lib/axios';
 import { apiError, shortDate } from '../../lib/format';
-import { Badge, Button, Card, CardTitle, EmptyState, ErrorText, Spinner, inputClass } from '../../components/ui';
+import { Badge, Button, Card, CardTitle, EmptyState, ErrorText, LoadingBlock, inputClass } from '../../components/ui';
 
 const STATUS = { pending: ['Por subir', 'amber'], review: ['En revisión', 'blue'], approved: ['Aprobado', 'green'], rejected: ['Rechazado', 'red'] };
 const ACCEPT = '.pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xlsx';
@@ -36,7 +36,7 @@ export default function Documents() {
 
   const failed = [slotMutation, generalMutation, deleteMutation].find((m) => m.isError);
 
-  if (isLoading) return <Spinner />;
+  if (isLoading) return <LoadingBlock />;
 
   // "Requeridos": lo que pidió el equipo y falta subir o hay que volver a subir
   const required = documents.filter((d) => d.status === 'pending' || (d.status === 'rejected' && d.source === 'required'));
@@ -61,7 +61,7 @@ export default function Documents() {
             <CardTitle action={<Badge tone="amber" dot>{required.length} pendiente(s)</Badge>}>Te pedimos estos documentos</CardTitle>
             <div className="flex flex-col gap-2.5">
               {required.map((doc) => (
-                <div key={doc.id} className="flex items-center gap-3 bg-brand-50/70 rounded-2xl p-3.5">
+                <div key={doc.id} className="flex items-center gap-3 bg-brand-50/70 rounded-xl p-3.5">
                   <div className="w-10 h-10 rounded-xl bg-white text-brand-600 flex items-center justify-center shrink-0"><FileText className="w-5 h-5" /></div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-bold text-gray-900 truncate">{doc.name}</div>
@@ -121,7 +121,7 @@ export default function Documents() {
       </div>
 
       <Card className="p-6 self-start">
-        <div className="w-11 h-11 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center mb-3"><Upload className="w-5 h-5" /></div>
+        <div className="w-11 h-11 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center mb-3"><Upload className="w-5 h-5" /></div>
         <h2 className="font-bold text-gray-900">Enviar un archivo</h2>
         <p className="text-xs text-gray-500 mt-1 mb-4 leading-relaxed">Textos, imágenes, accesos o cualquier material para tu proyecto. PDF, imágenes, Word o Excel, hasta 10 MB.</p>
         <input className={inputClass} placeholder="Nombre del archivo (opcional)" value={generalName} onChange={(e) => setGeneralName(e.target.value)} />

@@ -132,12 +132,12 @@ Las URLs absolutas se construyen con `BACKEND_BASE_URL` del `.env` — en produc
 | GET | `/appointments` | Admin, vendedor o n8n | Todas las citas (clientes y leads) |
 | GET | `/appointments/client/{client_id}` | Admin, vendedor o n8n | Citas de un cliente |
 | POST | `/appointments` | Admin, vendedor o n8n | Crea una cita. Body: `{title, appointment_date, time_slot, duration_minutes?, meeting_link?, notes?}` más `client_id` (cliente del portal) **o** `contact_name` / `contact_phone` (lead sin cuenta). |
-| PUT | `/appointments/{id}` | Admin, vendedor o n8n | Actualiza. Body: `{title?, description?, appointment_date?, time_slot?, duration_minutes?, status?, meeting_link?, notes?}` |
+| PUT | `/appointments/{id}` | Admin, vendedor o n8n | Pasar `status` de `pending` a `scheduled` **confirma** la reunión: notifica al cliente y dispara `/webhook/schedule-meeting` (evento `meeting_confirmed`; si n8n responde `meeting_link` queda guardado). De `pending` a `cancelled` la rechaza y avisa al cliente. Actualiza. Body: `{title?, description?, appointment_date?, time_slot?, duration_minutes?, status?, meeting_link?, notes?}` |
 | DELETE | `/appointments/{id}` | Admin / vendedor | El admin borra cualquiera; el vendedor solo las que creó |
-| POST | `/meetings/schedule` | Cliente | El cliente agenda desde su portal. Body: `{meeting_date, time_slot, topic}`. Dispara `/webhook/schedule-meeting` en n8n; si responde `meeting_link` queda guardado. 409 si el horario ya está reservado. |
+| POST | `/meetings/schedule` | Cliente | El cliente **solicita** una reunión. Body: `{meeting_date, time_slot, topic}`. Queda en `pending` (por confirmar) y avisa a n8n por `/webhook/meeting-requested`. 409 si el horario ya está apartado. |
 | GET | `/meetings/taken-slots?meeting_date=YYYY-MM-DD` | Token | Horarios ya reservados de ese día |
 
-**Valores de `status`**: `scheduled`, `completed`, `cancelled`, `no_show`
+**Valores de `status`**: `pending` (por confirmar), `scheduled` (confirmada), `completed`, `cancelled`, `no_show`
 **Valores de `source`**: `client`, `admin`, `seller`, `n8n`
 
 ---
@@ -267,3 +267,14 @@ Content-Type: application/json
   "type": "milestone"
 }
 ```
+
+## Automatización (interruptores del bot) — solo admin
+
+Los interruptores viven en n8n (`bot_config`); el portal los lee y cambia por el webhook `N8N_BOT_CONFIG_PATH` (`/webhook/bot-config`).
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/automation/flags` | Estado actual: `{ "flags": { "ia_global": true, ... } }`. 502 si n8n no responde. |
+| PUT | `/automation/flags` | Body `{ "flags": { "<clave>": true \| false } }`. Claves: `ia_global`, `followup_leads`, `recordatorios_citas`, `avisos_facturas`, `resumen_diario`, `formulario_web`, `ig_dm_palabra_clave`, `ig_respuestas_publicas`, `ig_dm_ia`. Otra clave → 400. |
+
+`ia_global` queda sincronizado con el interruptor general de la bandeja (`/whatsapp/settings`).

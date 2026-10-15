@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, X, Wrench, Check, AlertCircle, Trash2 } from 'lucide-react';
 import api from '../../lib/axios';
 import { apiError, daysUntil, money, shortDate } from '../../lib/format';
-import { Badge, Button, Card, EmptyState, ErrorText, Field, Modal, ModalActions, Spinner, Toggle, inputClass } from '../../components/ui';
+import { Badge, Button, Card, EmptyState, ErrorText, Field, Modal, ModalActions, LoadingBlock, Toggle, inputClass } from '../../components/ui';
 
 const parseTasks = (json) => {
   try { const t = JSON.parse(json || '[]'); return Array.isArray(t) ? t : []; } catch { return []; }
@@ -73,7 +73,7 @@ function CreatePlanModal({ clients, onClose }) {
               <div key={task} className="flex items-center gap-2 bg-brand-50/70 rounded-xl px-3 py-2">
                 <Check className="w-3.5 h-3.5 text-brand-600 shrink-0" />
                 <span className="text-sm flex-1">{task}</span>
-                <button type="button" aria-label={`Quitar ${task}`} onClick={() => setForm((p) => ({ ...p, tasks: p.tasks.filter((_, idx) => idx !== i) }))} className="text-gray-400 hover:text-red-500">
+                <button type="button" aria-label={`Quitar ${task}`} onClick={() => setForm((p) => ({ ...p, tasks: p.tasks.filter((_, idx) => idx !== i) }))} className="text-gray-500 hover:text-red-500">
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -117,7 +117,7 @@ export default function AdminMaintenance() {
       </div>
       <ErrorText>{(toggleMutation.isError && apiError(toggleMutation.error)) || (deleteMutation.isError && apiError(deleteMutation.error))}</ErrorText>
 
-      {isLoading ? <Spinner /> : plans.length === 0 ? (
+      {isLoading ? <LoadingBlock /> : plans.length === 0 ? (
         <Card><EmptyState icon={Wrench} title="Sin planes de mantenimiento">Crea un plan recurrente para que el cliente lo vea y pueda renovarlo desde su portal.</EmptyState></Card>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -136,11 +136,11 @@ export default function AdminMaintenance() {
                   </div>
                   <div className="text-right shrink-0">
                     <div className="font-extrabold text-gray-900 tabular-nums">{money(plan.price, plan.currency)}</div>
-                    <div className="text-[11px] text-gray-400">{plan.billing_cycle === 'annual' ? 'al año' : 'al mes'}</div>
+                    <div className="text-xs text-gray-500">{plan.billing_cycle === 'annual' ? 'al año' : 'al mes'}</div>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-xs bg-brand-50/70 rounded-2xl px-4 py-3 mb-3">
+                <div className="flex items-center justify-between text-xs bg-brand-50/70 rounded-xl px-4 py-3 mb-3">
                   <span className="text-gray-500">Próximo pago</span>
                   <span className="font-semibold text-gray-900">{shortDate(plan.next_payment_date)}</span>
                 </div>

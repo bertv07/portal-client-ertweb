@@ -24,7 +24,7 @@ class Appointment(Base):
     time_slot: Mapped[str] = mapped_column(String(20))  # e.g. "10:00 AM"
     duration_minutes: Mapped[int] = mapped_column(Integer, default=30)
 
-    status: Mapped[str] = mapped_column(String(50), default="scheduled")  # scheduled, completed, cancelled, no_show
+    status: Mapped[str] = mapped_column(String(50), default="scheduled")  # pending (por confirmar), scheduled, completed, cancelled, no_show
     meeting_link: Mapped[str | None] = mapped_column(String(512), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 

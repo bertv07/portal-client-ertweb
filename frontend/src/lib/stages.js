@@ -11,7 +11,8 @@ export const STAGES = [
 export const STAGE_MAP = Object.fromEntries(STAGES.map((s) => [s.id, s]));
 
 export const APPOINTMENT_STATUS = {
-  scheduled: { label: 'Agendada', tone: 'blue' },
+  pending: { label: 'Por confirmar', tone: 'amber' },
+  scheduled: { label: 'Confirmada', tone: 'blue' },
   completed: { label: 'Completada', tone: 'green' },
   cancelled: { label: 'Cancelada', tone: 'red' },
   no_show: { label: 'No asistió', tone: 'amber' },

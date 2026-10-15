@@ -4,7 +4,7 @@ import { CheckCircle, XCircle, Eye, FileText, Image, Plus, Trash2 } from 'lucide
 import api from '../../lib/axios';
 import { apiError, shortDate } from '../../lib/format';
 import {
-  Badge, Button, Card, EmptyState, ErrorText, Field, Modal, ModalActions, SearchInput, Spinner, Table, tdClass, inputClass,
+  Badge, Button, Card, EmptyState, ErrorText, Field, Modal, ModalActions, SearchInput, LoadingBlock, Table, tdClass, inputClass, textareaClass, Segmented
 } from '../../components/ui';
 
 const STATUS = { pending: ['Por subir', 'gray'], review: ['En revisión', 'amber'], approved: ['Aprobado', 'green'], rejected: ['Rechazado', 'red'] };
@@ -79,7 +79,7 @@ export default function AdminDocuments() {
         <Modal title="Rechazar documento" subtitle={`«${rejecting.name}» — el cliente verá el motivo y podrá subirlo de nuevo.`} onClose={() => setRejecting(null)}>
           <form onSubmit={(e) => { e.preventDefault(); statusMutation.mutate({ id: rejecting.id, status: 'rejected', admin_notes: notes || null }); }} className="flex flex-col gap-4">
             <Field label="Motivo (opcional)">
-              <textarea rows={3} className={`${inputClass} resize-none`} placeholder="Ej. La imagen está borrosa, súbela en mejor resolución." value={notes} onChange={(e) => setNotes(e.target.value)} />
+              <textarea rows={3} className={textareaClass} placeholder="Ej. La imagen está borrosa, súbela en mejor resolución." value={notes} onChange={(e) => setNotes(e.target.value)} />
             </Field>
             <ErrorText>{statusMutation.isError && apiError(statusMutation.error)}</ErrorText>
             <ModalActions onCancel={() => setRejecting(null)} submitLabel="Rechazar" loading={statusMutation.isPending} danger />
@@ -91,20 +91,14 @@ export default function AdminDocuments() {
         <SearchInput value={search} onChange={setSearch} placeholder="Buscar documento o cliente..." />
         <Button onClick={() => setShowRequest(true)}><Plus className="w-4 h-4" /> Solicitar documento</Button>
       </div>
-      <div className="flex gap-1 bg-white border border-brand-100/70 p-1 rounded-full self-start overflow-x-auto max-w-full">
-        {['all', 'review', 'pending', 'approved', 'rejected'].map((s) => (
-          <button
-            key={s} onClick={() => setStatusFilter(s)}
-            className={`px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${statusFilter === s ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}
-          >
-            {s === 'all' ? 'Todos' : STATUS[s][0]}
-          </button>
-        ))}
-      </div>
+      <Segmented
+        className="self-start" value={statusFilter} onChange={setStatusFilter}
+        options={['all', 'review', 'pending', 'approved', 'rejected'].map((s) => ({ id: s, label: s === 'all' ? 'Todos' : STATUS[s][0], count: s === 'all' ? docs.length : docs.filter((d) => d.status === s).length }))}
+      />
       <ErrorText>{(statusMutation.isError && !rejecting && apiError(statusMutation.error)) || (deleteMutation.isError && apiError(deleteMutation.error))}</ErrorText>
 
       <Card className="overflow-hidden">
-        {isLoading ? <Spinner /> : filtered.length === 0 ? (
+        {isLoading ? <LoadingBlock /> : filtered.length === 0 ? (
           <EmptyState icon={FileText} title="Sin documentos">Solicita un documento a un cliente o espera a que suba sus archivos.</EmptyState>
         ) : (
           <Table columns={['Documento', 'Cliente', 'Categoría', 'Estado', 'Fecha', { label: 'Acciones', right: true }]}>
@@ -113,11 +107,11 @@ export default function AdminDocuments() {
                 <td className={tdClass}>
                   <div className="flex items-center gap-2.5">
                     {['jpg', 'jpeg', 'png', 'webp'].includes(doc.file_type)
-                      ? <Image className="w-4 h-4 text-gray-400 shrink-0" />
-                      : <FileText className="w-4 h-4 text-gray-400 shrink-0" />}
+                      ? <Image className="w-4 h-4 text-gray-500 shrink-0" />
+                      : <FileText className="w-4 h-4 text-gray-500 shrink-0" />}
                     <span className="font-semibold text-gray-900 truncate max-w-[240px]" title={doc.name}>{doc.name}</span>
                   </div>
-                  {doc.admin_notes && <p className="text-xs text-gray-400 mt-0.5 pl-[26px]">{doc.admin_notes}</p>}
+                  {doc.admin_notes && <p className="text-xs text-gray-500 mt-0.5 pl-[26px]">{doc.admin_notes}</p>}
                 </td>
                 <td className={`${tdClass} text-gray-600`}>{clientMap[doc.client_id] || '—'}</td>
                 <td className={`${tdClass} text-gray-500 capitalize`}>{doc.doc_type}</td>

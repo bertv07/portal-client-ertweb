@@ -5,9 +5,11 @@ import { FolderKanban, FileText, Upload, Check, ArrowUpRight, Video, Wallet, Cal
 import clsx from 'clsx';
 import api from '../../lib/axios';
 import { apiError, longDate, money } from '../../lib/format';
-import { Badge, Button, Card, CardTitle, EmptyState, ErrorText, Spinner } from '../../components/ui';
+import { Badge, Button, Card, CardTitle, EmptyState, ErrorText, LoadingBlock, Segmented } from '../../components/ui';
 
 const PHASES = ['Planificación', 'Diseño', 'Desarrollo', 'QA', 'Entregado'];
+// En pantallas angostas los nombres completos no caben bajo cada columna
+const PHASES_SHORT = ['Plan', 'Diseño', 'Código', 'QA', 'Entrega'];
 const TYPES = { website: 'Sitio web', automation: 'Automatización', ecommerce: 'E-commerce', branding: 'Branding', other: 'Proyecto' };
 const STATUS = { active: ['En curso', 'green'], completed: ['Entregado', 'brand'], paused: ['En pausa', 'amber'], cancelled: ['Cancelado', 'red'] };
 
@@ -33,20 +35,23 @@ function Journey({ project }) {
           <li key={phase} className="flex-1 h-full flex flex-col justify-end items-center min-w-0" aria-current={now ? 'step' : undefined}>
             <div
               className={clsx(
-                'w-full rounded-2xl flex flex-col items-center justify-between py-3 transition-all',
+                'w-full rounded-xl flex flex-col items-center justify-between py-3 transition-all',
                 done && 'bg-brand-100/70 border border-brand-200',
                 now && 'bg-brand-600 border border-brand-600 text-white shadow-lg shadow-brand-600/25',
                 !done && !now && 'border border-dashed border-brand-200',
               )}
               style={{ height: `${36 + i * 16}%`, backgroundImage: !done && !now ? HATCH : undefined }}
             >
-              {now && <span className="text-[10px] font-bold bg-gray-900 text-white rounded-full px-2 py-0.5">Ahora</span>}
+              {now && <span className="text-[11px] font-bold bg-gray-900 text-white rounded-full px-2 py-0.5">Ahora</span>}
               {!now && <span />}
               {done && (
                 <span className="w-6 h-6 rounded-full bg-brand-600 text-white flex items-center justify-center"><Check className="w-3.5 h-3.5" strokeWidth={3} /></span>
               )}
             </div>
-            <span className={clsx('text-[10px] sm:text-xs mt-2 truncate max-w-full', now ? 'font-bold text-brand-700' : 'font-medium text-gray-500')}>{phase}</span>
+            <span className={clsx('text-xs mt-2 whitespace-nowrap', now ? 'font-bold text-brand-700' : 'font-medium text-gray-500')}>
+              <span className="sm:hidden" aria-hidden="true">{PHASES_SHORT[i]}</span>
+              <span className="max-sm:sr-only">{phase}</span>
+            </span>
           </li>
         );
       })}
@@ -74,15 +79,16 @@ export default function Dashboard() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['my-documents'] }),
   });
 
-  if (isLoading) return <Spinner />;
+  if (isLoading) return <LoadingBlock />;
 
   const project = projects.find((p) => p.id === activeProjectId) || projects[0];
   const today = new Date().toLocaleDateString('en-CA');
   const pendingDocs = documents.filter((d) => d.status === 'pending' || d.status === 'rejected');
   const unpaid = invoices.filter((i) => i.status === 'pending' || i.status === 'overdue');
   const nextMeeting = appointments
-    .filter((a) => a.status === 'scheduled' && a.appointment_date >= today)
+    .filter((a) => ['pending', 'scheduled'].includes(a.status) && a.appointment_date >= today)
     .sort((a, b) => a.appointment_date.localeCompare(b.appointment_date))[0];
+  const finished = project?.status === 'completed' || project?.progress_pct >= 100;
   const tags = (project?.updates_tags || '').split(',').map((t) => t.trim()).filter(Boolean);
 
   const handleFileChange = (e) => {
@@ -106,16 +112,10 @@ export default function Dashboard() {
         ) : (
           <Card className="p-6">
             {projects.length > 1 && (
-              <div className="flex gap-1 bg-brand-50 p-1 rounded-full mb-5 overflow-x-auto self-start max-w-full w-fit">
-                {projects.map((p) => (
-                  <button
-                    key={p.id} onClick={() => setActiveProjectId(p.id)}
-                    className={clsx('px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors', p.id === project.id ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900')}
-                  >
-                    {p.name}
-                  </button>
-                ))}
-              </div>
+              <Segmented
+                className="mb-6 !border-0 !bg-brand-50" value={project.id} onChange={setActiveProjectId}
+                options={projects.map((p) => ({ id: p.id, label: p.name }))}
+              />
             )}
 
             <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -131,8 +131,9 @@ export default function Dashboard() {
               <span className="text-5xl font-extrabold text-gray-900 tracking-tight tabular-nums">{project.progress_pct}%</span>
               <span className="text-sm text-gray-500">
                 completado
-                {project.remaining_weeks ? ` · faltan ~${project.remaining_weeks} semana${project.remaining_weeks === 1 ? '' : 's'}` : ''}
-                {project.estimated_weeks ? ` de ${project.estimated_weeks}` : ''}
+                {/* Un proyecto terminado no tiene semanas pendientes, diga lo que diga el campo */}
+                {!finished && project.remaining_weeks ? ` · faltan ~${project.remaining_weeks} semana${project.remaining_weeks === 1 ? '' : 's'}` : ''}
+                {!finished && project.estimated_weeks ? ` de ${project.estimated_weeks}` : ''}
               </span>
             </div>
 
@@ -140,7 +141,7 @@ export default function Dashboard() {
 
             {tags.length > 0 && (
               <div className="mt-6 pt-5 border-t border-brand-50">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2.5">Últimas novedades</div>
+                <div className="text-[13px] font-semibold text-gray-700 mb-3">Últimas novedades</div>
                 <div className="flex flex-wrap gap-2">
                   {tags.map((tag) => (
                     <span key={tag} className="inline-flex items-center gap-1.5 bg-brand-50 text-brand-800 px-3 py-1.5 rounded-full text-xs font-semibold">
@@ -166,11 +167,11 @@ export default function Dashboard() {
             <div className="flex flex-col gap-2.5">
               {uploadMutation.isError && <ErrorText>{apiError(uploadMutation.error, 'No se pudo subir el archivo (máx. 10 MB; PDF, imagen, Word o Excel).')}</ErrorText>}
               {pendingDocs.map((doc) => (
-                <div key={doc.id} className="flex items-center gap-3 bg-brand-50/70 rounded-2xl p-3">
+                <div key={doc.id} className="flex items-center gap-3 bg-brand-50/70 rounded-xl p-3">
                   <div className="w-9 h-9 rounded-xl bg-white text-brand-600 flex items-center justify-center shrink-0"><FileText className="w-4 h-4" /></div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-bold text-gray-900 truncate">{doc.name}</div>
-                    <div className="text-[11px] text-gray-500 truncate">{doc.status === 'rejected' ? `Rechazado: ${doc.admin_notes || 'súbelo de nuevo'}` : 'Documento por subir'}</div>
+                    <div className="text-xs text-gray-500 truncate">{doc.status === 'rejected' ? `Rechazado: ${doc.admin_notes || 'súbelo de nuevo'}` : 'Documento por subir'}</div>
                   </div>
                   <Button
                     size="sm" loading={uploadMutation.isPending && selectedDocId === doc.id}
@@ -181,13 +182,13 @@ export default function Dashboard() {
                 </div>
               ))}
               {unpaid.map((inv) => (
-                <Link key={inv.id} to="/billing" className="flex items-center gap-3 bg-brand-50/70 hover:bg-brand-100/70 rounded-2xl p-3 transition-colors">
+                <Link key={inv.id} to="/billing" className="flex items-center gap-3 bg-brand-50/70 hover:bg-brand-100/70 rounded-xl p-3 transition-colors">
                   <div className="w-9 h-9 rounded-xl bg-white text-brand-600 flex items-center justify-center shrink-0"><Wallet className="w-4 h-4" /></div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-bold text-gray-900 truncate">Factura {inv.number}</div>
-                    <div className="text-[11px] text-gray-500 tabular-nums">{money(inv.amount, inv.currency)}</div>
+                    <div className="text-xs text-gray-500 tabular-nums">{money(inv.amount, inv.currency)}</div>
                   </div>
-                  <ArrowUpRight className="w-4 h-4 text-gray-400 shrink-0" />
+                  <ArrowUpRight className="w-4 h-4 text-gray-500 shrink-0" />
                 </Link>
               ))}
             </div>
@@ -198,21 +199,23 @@ export default function Dashboard() {
           <CardTitle>Próxima reunión</CardTitle>
           {nextMeeting ? (
             <>
-              <div className="text-xs text-gray-500 capitalize">{longDate(nextMeeting.appointment_date)}</div>
+              <div className="text-xs text-gray-500 first-letter:uppercase">{longDate(nextMeeting.appointment_date)}</div>
               <div className="text-3xl font-extrabold text-gray-900 tracking-tight mt-0.5">{nextMeeting.time_slot}</div>
               <div className="text-sm text-gray-600 mt-1 truncate">{nextMeeting.title}</div>
               {nextMeeting.meeting_link ? (
-                <a href={nextMeeting.meeting_link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-sm font-bold text-white bg-brand-600 hover:bg-brand-700 rounded-2xl px-4 py-2.5 mt-4">
+                <a href={nextMeeting.meeting_link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-sm font-bold text-white bg-brand-600 hover:bg-brand-700 rounded-xl px-4 py-2.5 mt-4">
                   <Video className="w-4 h-4" /> Unirse
                 </a>
+              ) : nextMeeting.status === 'pending' ? (
+                <div className="mt-4"><Badge tone="amber" dot>Por confirmar</Badge></div>
               ) : (
-                <p className="text-[11px] text-gray-400 mt-3">El link de la videollamada aparecerá aquí.</p>
+                <p className="text-xs text-gray-500 mt-3">El link de la videollamada aparecerá aquí.</p>
               )}
             </>
           ) : (
             <>
               <p className="text-sm text-gray-500">No tienes reuniones agendadas.</p>
-              <Link to="/schedule" className="inline-flex items-center gap-2 text-sm font-bold text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-2xl px-4 py-2.5 mt-4">
+              <Link to="/schedule" className="inline-flex items-center gap-2 text-sm font-bold text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-xl px-4 py-2.5 mt-4">
                 <CalendarPlus className="w-4 h-4" /> Agendar reunión
               </Link>
             </>

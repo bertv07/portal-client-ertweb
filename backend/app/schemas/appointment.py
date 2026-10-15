@@ -35,6 +35,9 @@ class AppointmentUpdate(BaseModel):
 class AppointmentResponse(AppointmentBase):
     id: str
     client_id: Optional[str] = None
+    # Nombre y correo de la cuenta del cliente (solo en los listados del equipo)
+    client_name: Optional[str] = None
+    client_email: Optional[str] = None
     contact_name: Optional[str] = None
     contact_phone: Optional[str] = None
     conversation_id: Optional[str] = None

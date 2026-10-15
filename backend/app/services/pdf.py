@@ -10,6 +10,10 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+class PdfUnavailable(RuntimeError):
+    """WeasyPrint no puede cargar sus librerías del sistema (pasa fuera de Docker)."""
+
+
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
 
 _env = Environment(
@@ -29,7 +33,12 @@ def render_pdf(template_name: str, context: dict) -> bytes:
     run_in_threadpool desde endpoints async."""
     # Import perezoso: WeasyPrint necesita librerías del sistema (pango) que solo
     # están en la imagen Docker; así el resto de la API arranca sin ellas.
-    from weasyprint import HTML
+    try:
+        from weasyprint import HTML
+    except OSError as exc:
+        raise PdfUnavailable(
+            "No se puede generar el PDF: faltan las librerías de WeasyPrint (Pango) en este servidor."
+        ) from exc
 
     html = _env.get_template(template_name).render(logo_src=_logo_data_uri(), **context)
     return HTML(string=html).write_pdf()

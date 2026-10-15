@@ -1,9 +1,9 @@
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { Users, FolderKanban, Wallet, TrendingUp, ArrowUpRight, FileText, MessageCircle, CheckCircle2, ReceiptText } from 'lucide-react';
+import { FolderKanban, Wallet, ArrowUpRight, FileText, MessageCircle, CheckCircle2, ReceiptText, CalendarCheck } from 'lucide-react';
 import api from '../../lib/axios';
 import { money, moneyShort } from '../../lib/format';
-import { Avatar, Card, CardTitle, EmptyState, StatTile } from '../../components/ui';
+import { Avatar, Card, CardTitle, EmptyState, StatStrip } from '../../components/ui';
 import { BarChart, HBarList, ProgressBar } from '../../components/ui/charts';
 
 const PHASES = ['Planificación', 'Diseño', 'Desarrollo', 'QA', 'Entregado'];
@@ -14,6 +14,7 @@ export default function AdminDashboard() {
   const { data: invoices = [] } = useQuery({ queryKey: ['admin-invoices'], queryFn: () => api.get('/invoices/').then((r) => r.data) });
   const { data: docs = [] } = useQuery({ queryKey: ['admin-docs'], queryFn: () => api.get('/documents/').then((r) => r.data) });
   const { data: pendingPayments = [] } = useQuery({ queryKey: ['admin-pending-payments'], queryFn: () => api.get('/manual-payments/pending').then((r) => r.data) });
+  const { data: appointments = [] } = useQuery({ queryKey: ['appointments'], queryFn: () => api.get('/appointments/').then((r) => r.data) });
   const { data: conversations = [] } = useQuery({ queryKey: ['wa-conversations', ''], queryFn: () => api.get('/whatsapp/conversations').then((r) => r.data) });
 
   const clientMap = Object.fromEntries(clients.map((c) => [c.id, c.name]));
@@ -39,7 +40,10 @@ export default function AdminDashboard() {
 
   const byPhase = PHASES.map((ph) => ({ label: ph, value: activeProjects.filter((p) => p.phase === ph).length }));
 
+  const pendingMeetings = appointments.filter((a) => a.status === 'pending').length;
+
   const todo = [
+    pendingMeetings > 0 && { to: '/admin/appointments', icon: CalendarCheck, text: `${pendingMeetings} reunión(es) por confirmar` },
     pendingPayments.length > 0 && { to: '/admin/payments', icon: Wallet, text: `${pendingPayments.length} comprobante(s) de pago por revisar` },
     docsInReview.length > 0 && { to: '/admin/documents', icon: FileText, text: `${docsInReview.length} documento(s) esperando aprobación` },
     unreadChats > 0 && { to: '/admin/whatsapp', icon: MessageCircle, text: `${unreadChats} chat(s) de WhatsApp sin leer` },
@@ -48,12 +52,12 @@ export default function AdminDashboard() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatTile icon={Users} label="Clientes" value={clients.length} sub="cuentas registradas" />
-        <StatTile icon={FolderKanban} label="Proyectos activos" value={activeProjects.length} sub={`${projects.length} en total`} tone="blue" />
-        <StatTile icon={Wallet} label="Por cobrar" value={moneyShort(receivable)} sub={`${unpaid.length} factura(s) pendiente(s)`} tone="amber" />
-        <StatTile icon={TrendingUp} label="Cobrado este mes" value={moneyShort(thisMonth)} sub="facturas pagadas" tone="green" />
-      </div>
+      <StatStrip items={[
+        { label: 'Clientes', value: clients.length, sub: 'cuentas registradas' },
+        { label: 'Proyectos activos', value: activeProjects.length, sub: `${projects.length} en total` },
+        { label: 'Por cobrar', value: moneyShort(receivable), sub: `${unpaid.length} factura(s) pendiente(s)`, tone: unpaid.length ? 'amber' : undefined },
+        { label: 'Cobrado este mes', value: moneyShort(thisMonth), sub: 'facturas pagadas', tone: thisMonth ? 'green' : undefined },
+      ]} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <Card className="p-6 lg:col-span-2">
@@ -72,10 +76,10 @@ export default function AdminDashboard() {
           ) : (
             <div className="flex flex-col gap-2">
               {todo.map((t) => (
-                <Link key={t.to} to={t.to} className="flex items-center gap-3 bg-brand-50/70 hover:bg-brand-100/70 rounded-2xl px-4 py-3 transition-colors group">
+                <Link key={t.to} to={t.to} className="flex items-center gap-3 bg-brand-50/70 hover:bg-brand-100/70 rounded-xl px-4 py-3 transition-colors group">
                   <t.icon className="w-4 h-4 text-brand-600 shrink-0" />
                   <span className="flex-1 text-sm font-medium text-gray-800">{t.text}</span>
-                  <ArrowUpRight className="w-4 h-4 text-gray-400 group-hover:text-brand-700 shrink-0" />
+                  <ArrowUpRight className="w-4 h-4 text-gray-500 group-hover:text-brand-700 shrink-0" />
                 </Link>
               ))}
             </div>
@@ -101,7 +105,7 @@ export default function AdminDashboard() {
                       <span className="text-xs text-gray-500 shrink-0 tabular-nums">{p.phase} · {p.progress_pct}%</span>
                     </div>
                     <ProgressBar value={p.progress_pct} />
-                    <div className="text-[11px] text-gray-400 mt-1 truncate">{clientMap[p.client_id] || '—'}</div>
+                    <div className="text-xs text-gray-500 mt-1 truncate">{clientMap[p.client_id] || '—'}</div>
                   </div>
                 </div>
               ))}

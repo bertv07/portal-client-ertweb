@@ -4,7 +4,7 @@ import { Plus, Download, Trash2, ReceiptText, FileOutput, Check } from 'lucide-r
 import api from '../../lib/axios';
 import { apiError, money, shortDate } from '../../lib/format';
 import {
-  Badge, Button, Card, EmptyState, ErrorText, Field, Modal, ModalActions, SearchInput, Spinner, StatTile, Table, tdClass, inputClass,
+  Badge, Button, Card, EmptyState, ErrorText, Field, Modal, ModalActions, SearchInput, LoadingBlock, StatStrip, Table, tdClass, inputClass,
 } from '../../components/ui';
 
 const STATUS = { pending: ['Pendiente', 'amber'], paid: ['Pagada', 'green'], overdue: ['Vencida', 'red'], cancelled: ['Cancelada', 'gray'] };
@@ -92,11 +92,11 @@ export default function AdminInvoices() {
     <div className="flex flex-col gap-5">
       {showCreate && <CreateInvoiceModal clients={clients} projects={projects} onClose={() => setShowCreate(false)} />}
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatTile label="Por cobrar" value={money(sum('pending') + sum('overdue'))} sub={`${invoices.filter((i) => ['pending', 'overdue'].includes(i.status)).length} factura(s)`} tone="amber" />
-        <StatTile label="Cobrado" value={money(sum('paid'))} sub={`${invoices.filter((i) => i.status === 'paid').length} factura(s)`} tone="green" />
-        <StatTile label="Emitidas" value={invoices.length} sub="en total" className="col-span-2 lg:col-span-1" />
-      </div>
+      <StatStrip items={[
+        { label: 'Por cobrar', value: money(sum('pending') + sum('overdue')), sub: `${invoices.filter((i) => ['pending', 'overdue'].includes(i.status)).length} factura(s)`, tone: 'amber' },
+        { label: 'Cobrado', value: money(sum('paid')), sub: `${invoices.filter((i) => i.status === 'paid').length} factura(s)`, tone: 'green' },
+        { label: 'Emitidas', value: invoices.length, sub: 'en total' },
+      ]} />
 
       <div className="flex items-center gap-3 flex-wrap">
         <SearchInput value={search} onChange={setSearch} placeholder="Buscar factura o cliente..." />
@@ -105,7 +105,7 @@ export default function AdminInvoices() {
       <ErrorText>{failed && apiError(failed.error)}</ErrorText>
 
       <Card className="overflow-hidden">
-        {isLoading ? <Spinner /> : filtered.length === 0 ? (
+        {isLoading ? <LoadingBlock /> : filtered.length === 0 ? (
           <EmptyState icon={ReceiptText} title={search ? 'Sin resultados' : 'Sin facturas todavía'} />
         ) : (
           <Table columns={['Factura', 'Cliente', 'Monto', 'Vence', 'Estado', { label: 'Acciones', right: true }]}>
@@ -113,7 +113,7 @@ export default function AdminInvoices() {
               <tr key={inv.id} className="hover:bg-brand-50/40 transition-colors">
                 <td className={tdClass}>
                   <div className="font-semibold text-gray-900">{inv.number}</div>
-                  <div className="text-xs text-gray-400 max-w-[240px] truncate">{inv.description}</div>
+                  <div className="text-xs text-gray-500 max-w-[240px] truncate">{inv.description}</div>
                 </td>
                 <td className={`${tdClass} text-gray-600`}>{clientMap[inv.client_id] || '—'}</td>
                 <td className={`${tdClass} font-semibold text-gray-900 tabular-nums whitespace-nowrap`}>{money(inv.amount, inv.currency)}</td>

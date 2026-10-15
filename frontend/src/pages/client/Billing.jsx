@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Wallet, Download, CheckCircle2, ReceiptText, Clock } from 'lucide-react';
 import api from '../../lib/axios';
 import { money, shortDate } from '../../lib/format';
-import { Badge, Button, Card, CardTitle, EmptyState, Spinner } from '../../components/ui';
+import { Badge, Button, Card, CardTitle, EmptyState, LoadingBlock } from '../../components/ui';
 import PaymentModal from '../../components/payments/PaymentModal';
 
 const STATUS = { pending: ['Pendiente', 'amber'], paid: ['Pagada', 'green'], overdue: ['Vencida', 'red'], cancelled: ['Cancelada', 'gray'] };
@@ -15,7 +15,7 @@ export default function Billing() {
   const { data: invoices = [], isLoading } = useQuery({ queryKey: ['my-invoices'], queryFn: () => api.get('/invoices/me').then((r) => r.data) });
   const { data: manualPayments = [] } = useQuery({ queryKey: ['my-manual-payments'], queryFn: () => api.get('/manual-payments/me').then((r) => r.data) });
 
-  if (isLoading) return <Spinner />;
+  if (isLoading) return <LoadingBlock />;
 
   // Facturas con un comprobante enviado que todavía no revisamos
   const inReview = new Set(manualPayments.filter((p) => p.status === 'pending' && p.invoice_id).map((p) => p.invoice_id));
@@ -87,7 +87,7 @@ export default function Billing() {
                           : <Badge tone={STATUS[inv.status]?.[1]} dot>{STATUS[inv.status]?.[0] || inv.status}</Badge>}
                       </div>
                       <p className="text-xs text-gray-500 mt-1 truncate">{inv.description || 'Sin descripción'}</p>
-                      <p className="text-[11px] text-gray-400 mt-0.5">
+                      <p className="text-xs text-gray-500 mt-0.5">
                         {inv.status === 'paid' ? `Pagada el ${shortDate(inv.paid_at)}` : inv.due_date ? `Vence el ${shortDate(inv.due_date)}` : 'Sin fecha de vencimiento'}
                       </p>
                     </div>

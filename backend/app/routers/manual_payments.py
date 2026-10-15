@@ -17,7 +17,6 @@ import uuid
 from pathlib import Path
 from datetime import datetime, timezone, date, timedelta
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -32,6 +31,7 @@ from app.schemas.manual_payment import ManualPaymentResponse, ManualPaymentStatu
 from app.api.deps import get_current_user, get_current_admin_user, require_admin_or_n8n, require_n8n
 from app.models.user import User
 from app.services.notify import add_notification
+from app.services.n8n import post_webhook
 
 logger = logging.getLogger(__name__)
 
@@ -79,17 +79,12 @@ async def _notify_n8n_new_payment(payment: ManualPayment, client: User) -> None:
         "submitted_at": payment.created_at.isoformat() if payment.created_at else None,
     }
 
-    webhook_url = f"{settings.N8N_WEBHOOK_BASE_URL}/webhook/manual-payment-submitted"
-    try:
-        async with httpx.AsyncClient() as client_http:
-            resp = await client_http.post(webhook_url, json=payload, timeout=5.0)
-            if resp.status_code == 200:
-                logger.info("n8n notificado — pago %s", payment.id)
-            else:
-                logger.warning("n8n respondió %s para pago %s", resp.status_code, payment.id)
-    except Exception as exc:
-        # No bloqueamos al cliente si n8n está offline
-        logger.warning("No se pudo notificar n8n (pago %s): %s", payment.id, exc)
+    # No bloqueamos al cliente si n8n está offline (post_webhook nunca lanza)
+    ok, _, error = await post_webhook("/webhook/manual-payment-submitted", payload, timeout=5.0)
+    if ok:
+        logger.info("n8n notificado — pago %s", payment.id)
+    else:
+        logger.warning("No se pudo notificar n8n (pago %s): %s", payment.id, error)
 
 
 # ─── Endpoints ───────────────────────────────────────────────────────────────

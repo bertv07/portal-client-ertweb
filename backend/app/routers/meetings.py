@@ -15,6 +15,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/meetings", tags=["meetings"])
 
+# Un horario solicitado o confirmado ya no está disponible para otro cliente
+BLOCKING_STATUSES = ("pending", "scheduled")
+
 class MeetingScheduleRequest(BaseModel):
     meeting_date: date
     time_slot: str
@@ -26,7 +29,9 @@ async def schedule_meeting(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Client: Schedule a meeting. Persists in DB and triggers n8n Google Calendar workflow."""
+    """Cliente: solicita una reunión. Queda en estado `pending` (por confirmar)
+    hasta que el equipo la confirme desde la Agenda; ahí se crea el evento en el
+    calendario. Aquí solo se avisa a n8n (webhook `meeting-requested`)."""
     if req.meeting_date < datetime.now(timezone.utc).date():
         raise HTTPException(status_code=400, detail="La fecha de la reunión ya pasó")
 
@@ -35,7 +40,7 @@ async def schedule_meeting(
         select(Appointment.id).where(
             Appointment.appointment_date == req.meeting_date,
             Appointment.time_slot == req.time_slot,
-            Appointment.status == "scheduled",
+            Appointment.status.in_(BLOCKING_STATUSES),
         )
     )
     if taken.first():
@@ -48,7 +53,7 @@ async def schedule_meeting(
         appointment_date=req.meeting_date,
         time_slot=req.time_slot,
         duration_minutes=30,
-        status="scheduled",
+        status="pending",
         source="client",
     )
     db.add(appointment)
@@ -66,19 +71,15 @@ async def schedule_meeting(
         "created_at": datetime.now(timezone.utc).isoformat()
     }
 
-    ok, data, _ = await post_webhook("/webhook/schedule-meeting", payload, timeout=8.0)
-    # Si el workflow devuelve el link de Meet, queda guardado en la cita
-    meeting_link = data.get("meeting_link") or data.get("hangoutLink")
-    if ok and meeting_link:
-        appointment.meeting_link = meeting_link
-        await db.commit()
+    # Aviso al equipo: la reunión todavía NO está confirmada
+    ok, _, _ = await post_webhook("/webhook/meeting-requested", {**payload, "event": "meeting_requested"}, timeout=6.0)
 
     return {
-        "message": "Reunión agendada exitosamente." if ok else "Reunión registrada localmente (n8n offline).",
+        "message": "Solicitud enviada. Te avisaremos cuando el equipo la confirme.",
+        "status": appointment.status,
         "payload": payload,
         "n8n_status": "success" if ok else "offline",
         "appointment_id": appointment.id,
-        "meeting_link": appointment.meeting_link,
     }
 
 
@@ -92,7 +93,7 @@ async def get_taken_slots(
     result = await db.execute(
         select(Appointment.time_slot).where(
             Appointment.appointment_date == meeting_date,
-            Appointment.status == "scheduled",
+            Appointment.status.in_(BLOCKING_STATUSES),
         )
     )
     return {"taken": sorted({slot for (slot,) in result.all()})}

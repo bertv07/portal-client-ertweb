@@ -1,12 +1,12 @@
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { MessageCircle, Users, CalendarCheck, Trophy, ArrowUpRight, Bot } from 'lucide-react';
+import { MessageCircle, CalendarCheck, ArrowUpRight, Bot } from 'lucide-react';
 import api from '../../lib/axios';
 import { useAuth } from '../../context/AuthContext';
 import { staffBase } from '../../lib/roles';
 import { formatPhone, longDate, timeAgo } from '../../lib/format';
 import { STAGES } from '../../lib/stages';
-import { Avatar, Card, CardTitle, EmptyState, Spinner, StatTile } from '../../components/ui';
+import { Avatar, Card, CardTitle, EmptyState, LoadingBlock, StatStrip } from '../../components/ui';
 import { BarChart, Gauge, HBarList } from '../../components/ui/charts';
 
 const dayKey = (d) => d.toLocaleDateString('en-CA');
@@ -29,7 +29,7 @@ export function SalesOverview() {
     queryFn: () => api.get('/whatsapp/settings').then((r) => r.data),
   });
 
-  if (isLoading) return <Spinner />;
+  if (isLoading) return <LoadingBlock />;
 
   const today = dayKey(new Date());
   const unread = conversations.filter((c) => c.unread_count > 0);
@@ -39,6 +39,8 @@ export function SalesOverview() {
   const upcoming = appointments
     .filter((a) => a.status === 'scheduled' && a.appointment_date >= today)
     .sort((a, b) => a.appointment_date.localeCompare(b.appointment_date));
+
+  const pendingMeetings = appointments.filter((a) => a.status === 'pending').length;
 
   // Leads nuevos por día, últimos 7 días
   const days = Array.from({ length: 7 }, (_, i) => {
@@ -58,12 +60,12 @@ export function SalesOverview() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatTile icon={MessageCircle} label="Chats sin leer" value={unread.length} sub={unread.length ? 'esperan respuesta' : 'todo al día'} tone={unread.length ? 'amber' : 'green'} />
-        <StatTile icon={Users} label="Leads activos" value={open.length} sub={`${conversations.length} chats en total`} />
-        <StatTile icon={CalendarCheck} label="Citas próximas" value={upcoming.length} sub={`${upcoming.filter((a) => a.appointment_date === today).length} hoy`} tone="blue" />
-        <StatTile icon={Trophy} label="Ventas cerradas" value={won} sub={`${lost} perdidos`} tone="green" />
-      </div>
+      <StatStrip items={[
+        { label: 'Chats sin leer', value: unread.length, sub: unread.length ? 'esperan respuesta' : 'todo al día', tone: unread.length ? 'amber' : 'green' },
+        { label: 'Leads activos', value: open.length, sub: `${conversations.length} chats en total` },
+        { label: 'Citas próximas', value: upcoming.length, sub: pendingMeetings ? `${pendingMeetings} por confirmar` : `${upcoming.filter((a) => a.appointment_date === today).length} hoy`, tone: pendingMeetings ? 'amber' : undefined },
+        { label: 'Ventas cerradas', value: won, sub: `${lost} perdidos` },
+      ]} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <Card className="p-6 lg:col-span-2">
@@ -85,7 +87,7 @@ export function SalesOverview() {
             )}
           </div>
           <div className="flex items-center gap-2 mt-4 pt-4 border-t border-brand-50 text-xs text-gray-600">
-            <Bot className={settings?.ai_enabled === false ? 'w-4 h-4 text-gray-400' : 'w-4 h-4 text-brand-600'} />
+            <Bot className={settings?.ai_enabled === false ? 'w-4 h-4 text-gray-500' : 'w-4 h-4 text-brand-600'} />
             {settings?.ai_enabled === false ? 'La IA está apagada para todos los chats.' : `IA activa · ${conversations.filter((c) => !c.ai_enabled).length} chats pausados`}
           </div>
         </Card>
@@ -108,13 +110,13 @@ export function SalesOverview() {
           ) : (
             <div className="flex flex-col gap-1 -mx-2">
               {unread.slice(0, 5).map((c) => (
-                <Link key={c.id} to={`${base}/whatsapp?c=${c.id}`} className="flex items-center gap-3 p-2 rounded-2xl hover:bg-brand-50 transition-colors">
+                <Link key={c.id} to={`${base}/whatsapp?c=${c.id}`} className="flex items-center gap-3 p-2 rounded-xl hover:bg-brand-50 transition-colors">
                   <Avatar name={c.contact_name || c.phone} size="sm" />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-bold text-gray-900 truncate">{c.contact_name || formatPhone(c.phone)}</div>
                     <div className="text-xs text-gray-500 truncate">{c.last_message_text}</div>
                   </div>
-                  <span className="text-[10px] text-gray-400 shrink-0">{timeAgo(c.last_message_at)}</span>
+                  <span className="text-[11px] text-gray-500 shrink-0">{timeAgo(c.last_message_at)}</span>
                 </Link>
               ))}
             </div>
@@ -131,12 +133,12 @@ export function SalesOverview() {
             <div className="flex flex-col gap-3">
               {upcoming.slice(0, 4).map((a) => (
                 <div key={a.id} className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-2xl bg-brand-50 text-brand-700 flex flex-col items-center justify-center shrink-0 leading-none">
+                  <div className="w-11 h-11 rounded-xl bg-brand-50 text-brand-700 flex flex-col items-center justify-center shrink-0 leading-none">
                     <span className="text-sm font-extrabold">{a.appointment_date.slice(8, 10)}</span>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-bold text-gray-900 truncate">{a.title}</div>
-                    <div className="text-xs text-gray-500 truncate capitalize">{longDate(a.appointment_date)} · {a.time_slot}</div>
+                    <div className="text-xs text-gray-500 truncate first-letter:uppercase">{longDate(a.appointment_date)} · {a.time_slot}</div>
                   </div>
                 </div>
               ))}

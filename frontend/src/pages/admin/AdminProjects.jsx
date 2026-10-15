@@ -4,7 +4,7 @@ import { Plus, Edit2, Trash2, FolderKanban } from 'lucide-react';
 import api from '../../lib/axios';
 import { apiError } from '../../lib/format';
 import {
-  Badge, Button, Card, EmptyState, ErrorText, Field, Modal, ModalActions, SearchInput, Spinner, Table, tdClass, inputClass,
+  Badge, Button, Card, EmptyState, ErrorText, Field, Modal, ModalActions, SearchInput, LoadingBlock, Table, tdClass, inputClass, textareaClass
 } from '../../components/ui';
 import { ProgressBar } from '../../components/ui/charts';
 
@@ -61,7 +61,7 @@ function ProjectFormModal({ project, clients, onClose }) {
           </Field>
         )}
         <Field label="Nombre del proyecto"><input required className={inputClass} value={form.name} onChange={set('name')} /></Field>
-        <Field label="Descripción"><textarea rows={2} className={`${inputClass} resize-none`} value={form.description} onChange={set('description')} /></Field>
+        <Field label="Descripción"><textarea rows={2} className={textareaClass} value={form.description} onChange={set('description')} /></Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Tipo">
             <select className={inputClass} value={form.project_type} onChange={set('project_type')}>
@@ -122,7 +122,7 @@ export default function AdminProjects() {
       <ErrorText>{deleteMutation.isError && apiError(deleteMutation.error)}</ErrorText>
 
       <Card className="overflow-hidden">
-        {isLoading ? <Spinner /> : filtered.length === 0 ? (
+        {isLoading ? <LoadingBlock /> : filtered.length === 0 ? (
           <EmptyState icon={FolderKanban} title={search ? 'Sin resultados' : 'Sin proyectos todavía'}>
             {!search && 'Crea el proyecto de un cliente para que vea su avance en el portal.'}
           </EmptyState>
@@ -132,7 +132,7 @@ export default function AdminProjects() {
               <tr key={p.id} className="hover:bg-brand-50/40 transition-colors">
                 <td className={tdClass}>
                   <div className="font-semibold text-gray-900">{p.name}</div>
-                  <div className="text-xs text-gray-400">{TYPES[p.project_type] || p.project_type}</div>
+                  <div className="text-xs text-gray-500">{TYPES[p.project_type] || p.project_type}</div>
                 </td>
                 <td className={`${tdClass} text-gray-600`}>{clientMap[p.client_id] || '—'}</td>
                 <td className={`${tdClass} text-gray-600`}>{p.phase}</td>

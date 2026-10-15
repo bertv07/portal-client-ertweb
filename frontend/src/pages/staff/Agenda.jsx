@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Edit2, Trash2, CalendarCheck, Clock, ExternalLink } from 'lucide-react';
+import { Plus, Edit2, Trash2, CalendarCheck, ExternalLink, Check, X } from 'lucide-react';
 import api from '../../lib/axios';
 import { useAuth } from '../../context/AuthContext';
 import { apiError, formatPhone, longDate, TIME_SLOTS } from '../../lib/format';
 import { APPOINTMENT_STATUS } from '../../lib/stages';
 import {
-  Badge, Button, Card, EmptyState, ErrorText, Field, Modal, ModalActions, SearchInput, Spinner, StatTile, Table, tdClass, inputClass,
+  Badge, Button, Card, EmptyState, ErrorText, Field, Modal, ModalActions, SearchInput, LoadingBlock, Segmented, StatStrip, Table, tdClass, inputClass, textareaClass,
 } from '../../components/ui';
 
 const SOURCE_LABELS = { client: 'Cliente', admin: 'Admin', seller: 'Vendedor', n8n: 'n8n' };
@@ -54,16 +54,10 @@ function AppointmentFormModal({ appointment, clients, isAdmin, onClose }) {
         {!appointment && (
           <>
             {isAdmin && (
-              <div className="flex gap-1.5 bg-gray-100 p-1 rounded-2xl">
-                {[['client', 'Cliente del portal'], ['contact', 'Lead / contacto']].map(([id, label]) => (
-                  <button
-                    key={id} type="button" onClick={() => setForm((p) => ({ ...p, who: id }))}
-                    className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-colors ${form.who === id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+              <Segmented
+                className="self-start" value={form.who} onChange={(who) => setForm((p) => ({ ...p, who }))}
+                options={[{ id: 'client', label: 'Cliente del portal' }, { id: 'contact', label: 'Lead / contacto' }]}
+              />
             )}
             {form.who === 'client' ? (
               <Field label="Cliente">
@@ -101,7 +95,7 @@ function AppointmentFormModal({ appointment, clients, isAdmin, onClose }) {
           </Field>
         </div>
         <Field label="Link de la reunión (Meet / Zoom)"><input type="url" className={inputClass} placeholder="https://" value={form.meeting_link} onChange={set('meeting_link')} /></Field>
-        <Field label="Notas internas"><textarea rows={2} className={`${inputClass} resize-none`} value={form.notes} onChange={set('notes')} /></Field>
+        <Field label="Notas internas"><textarea rows={2} className={textareaClass} value={form.notes} onChange={set('notes')} /></Field>
         <ErrorText>{mutation.isError && apiError(mutation.error, 'Error al guardar la cita')}</ErrorText>
         <ModalActions onCancel={onClose} submitLabel={appointment ? 'Guardar cambios' : 'Crear cita'} loading={mutation.isPending} />
       </form>
@@ -114,7 +108,7 @@ export default function Agenda() {
   const { user } = useAuth();
   const isAdmin = user.role === 'admin';
   const [search, setSearch] = useState('');
-  const [tab, setTab] = useState('upcoming');
+  const [tab, setTab] = useState(null); // null = decide según haya o no solicitudes por confirmar
   const [modal, setModal] = useState(null); // null | 'create' | appointment
 
   const { data: appointments = [], isLoading } = useQuery({
@@ -132,18 +126,33 @@ export default function Agenda() {
     mutationFn: (id) => api.delete(`/appointments/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['appointments'] }),
   });
+  // Confirmar (pending → scheduled) crea el evento en el calendario y avisa al cliente
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }) => api.put(`/appointments/${id}`, { status }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['appointments'] }),
+  });
 
   const clientMap = Object.fromEntries(clients.map((c) => [c.id, c]));
-  const who = (a) => clientMap[a.client_id]?.name || a.contact_name || (a.client_id ? 'Cliente del portal' : '—');
-  const whoSub = (a) => clientMap[a.client_id]?.email || formatPhone(a.contact_phone);
+  const who = (a) => a.client_name || clientMap[a.client_id]?.name || a.contact_name || '—';
+  const whoSub = (a) => a.client_email || clientMap[a.client_id]?.email || formatPhone(a.contact_phone);
 
   const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD local
+  const isPending = (a) => a.status === 'pending';
   const isUpcoming = (a) => a.appointment_date >= today && a.status === 'scheduled';
+  const pendingCount = appointments.filter(isPending).length;
+  const activeTab = tab ?? (pendingCount > 0 ? 'pending' : 'upcoming');
+  const inTab = { pending: isPending, upcoming: isUpcoming, past: (a) => !isPending(a) && !isUpcoming(a) }[activeTab];
   const q = search.trim().toLowerCase();
   const filtered = appointments
-    .filter((a) => (tab === 'upcoming' ? isUpcoming(a) : !isUpcoming(a)))
+    .filter(inTab)
     .filter((a) => !q || a.title.toLowerCase().includes(q) || who(a).toLowerCase().includes(q))
-    .sort((a, b) => (tab === 'upcoming' ? 1 : -1) * a.appointment_date.localeCompare(b.appointment_date));
+    .sort((a, b) => (activeTab === 'past' ? -1 : 1) * a.appointment_date.localeCompare(b.appointment_date));
+
+  const emptyCopy = {
+    pending: ['Nada por confirmar', 'Cuando un cliente pida una reunión desde su portal aparecerá aquí para que la confirmes.'],
+    upcoming: ['No hay citas próximas', 'Agenda una desde aquí o directamente desde un chat de WhatsApp.'],
+    past: ['Sin historial todavía', ''],
+  }[activeTab];
 
   return (
     <div className="flex flex-col gap-5">
@@ -151,56 +160,65 @@ export default function Agenda() {
         <AppointmentFormModal appointment={modal === 'create' ? null : modal} clients={clients} isAdmin={isAdmin} onClose={() => setModal(null)} />
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatTile icon={CalendarCheck} label="Hoy" value={appointments.filter((a) => a.appointment_date === today && a.status === 'scheduled').length} sub="citas agendadas" />
-        <StatTile icon={Clock} label="Próximas" value={appointments.filter(isUpcoming).length} sub="por atender" tone="blue" />
-        <StatTile label="Completadas" value={appointments.filter((a) => a.status === 'completed').length} sub="en total" />
-        <StatTile label="No asistió" value={appointments.filter((a) => a.status === 'no_show').length} sub="en total" />
-      </div>
+      <StatStrip items={[
+        { label: 'Por confirmar', value: pendingCount, sub: pendingCount ? 'esperan tu respuesta' : 'todo respondido', tone: pendingCount ? 'amber' : undefined },
+        { label: 'Hoy', value: appointments.filter((a) => a.appointment_date === today && a.status === 'scheduled').length, sub: 'citas confirmadas' },
+        { label: 'Próximas', value: appointments.filter(isUpcoming).length, sub: 'por atender' },
+        { label: 'Completadas', value: appointments.filter((a) => a.status === 'completed').length, sub: `${appointments.filter((a) => a.status === 'no_show').length} no asistieron` },
+      ]} />
 
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex gap-1.5 bg-white border border-brand-100/70 p-1 rounded-full">
-          {[['upcoming', 'Próximas'], ['past', 'Historial']].map(([id, label]) => (
-            <button
-              key={id} onClick={() => setTab(id)}
-              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors ${tab === id ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          value={activeTab} onChange={setTab}
+          options={[{ id: 'pending', label: 'Por confirmar', count: pendingCount }, { id: 'upcoming', label: 'Próximas' }, { id: 'past', label: 'Historial' }]}
+        />
         <SearchInput value={search} onChange={setSearch} placeholder="Buscar cita o persona..." />
         <Button onClick={() => setModal('create')}><Plus className="w-4 h-4" /> Nueva cita</Button>
       </div>
-      <ErrorText>{deleteMutation.isError && apiError(deleteMutation.error)}</ErrorText>
+      <ErrorText>{(deleteMutation.isError && apiError(deleteMutation.error)) || (statusMutation.isError && apiError(statusMutation.error))}</ErrorText>
 
       <Card className="overflow-hidden">
-        {isLoading ? <Spinner /> : filtered.length === 0 ? (
-          <EmptyState icon={CalendarCheck} title={search ? 'Sin resultados' : tab === 'upcoming' ? 'No hay citas próximas' : 'Sin historial todavía'}>
-            {tab === 'upcoming' && !search && 'Agenda una desde aquí o directamente desde un chat de WhatsApp.'}
-          </EmptyState>
+        {isLoading ? <LoadingBlock /> : filtered.length === 0 ? (
+          <EmptyState icon={CalendarCheck} title={search ? 'Sin resultados' : emptyCopy[0]}>{!search && emptyCopy[1]}</EmptyState>
         ) : (
-          <Table columns={['Fecha', 'Hora', 'Con', 'Asunto', 'Estado', 'Origen', 'Reunión', { label: 'Acciones', right: true }]}>
+          <Table columns={['Cuándo', 'Con', 'Estado', { label: 'Acciones', right: true }]}>
             {filtered.map((a) => (
               <tr key={a.id} className="hover:bg-brand-50/40 transition-colors">
-                <td className={`${tdClass} font-semibold text-gray-800 whitespace-nowrap capitalize`}>{longDate(a.appointment_date)}</td>
-                <td className={`${tdClass} text-gray-600 whitespace-nowrap tabular-nums`}>{a.time_slot} · {a.duration_minutes} min</td>
-                <td className={tdClass}>
-                  <div className="font-semibold text-gray-900">{who(a)}</div>
-                  <div className="text-xs text-gray-400">{whoSub(a)}</div>
+                <td className={`${tdClass} whitespace-nowrap`}>
+                  <div className="font-semibold text-gray-900 first-letter:uppercase">{longDate(a.appointment_date)}</div>
+                  <div className="text-[13px] text-gray-500 tabular-nums">{a.time_slot} · {a.duration_minutes} min</div>
                 </td>
-                <td className={`${tdClass} text-gray-700 max-w-[220px] truncate`} title={a.title}>{a.title}</td>
-                <td className={tdClass}><Badge tone={APPOINTMENT_STATUS[a.status]?.tone} dot>{APPOINTMENT_STATUS[a.status]?.label || a.status}</Badge></td>
-                <td className={`${tdClass} text-xs text-gray-500`}>{SOURCE_LABELS[a.source] || a.source}</td>
-                <td className={tdClass}>
-                  {a.meeting_link ? (
-                    <a href={a.meeting_link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-brand-700 hover:underline text-xs font-semibold">
-                      <ExternalLink className="w-3.5 h-3.5" /> Abrir
+                <td className={`${tdClass} min-w-[200px]`}>
+                  <div className="font-semibold text-gray-900">{who(a)}</div>
+                  <div className="text-[13px] text-gray-500 truncate max-w-[320px]" title={a.title}>{a.title}</div>
+                  <div className="text-xs text-gray-500">{[whoSub(a), `Origen: ${(SOURCE_LABELS[a.source] || a.source).toLowerCase()}`].filter(Boolean).join(' · ')}</div>
+                </td>
+                <td className={`${tdClass} whitespace-nowrap`}>
+                  <Badge tone={APPOINTMENT_STATUS[a.status]?.tone} dot>{APPOINTMENT_STATUS[a.status]?.label || a.status}</Badge>
+                  {a.meeting_link && (
+                    <a href={a.meeting_link} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-brand-700 hover:underline text-xs font-semibold mt-1.5">
+                      <ExternalLink className="w-3.5 h-3.5" /> Abrir reunión
                     </a>
-                  ) : <span className="text-gray-300 text-xs">—</span>}
+                  )}
                 </td>
                 <td className={tdClass}>
                   <div className="flex items-center justify-end gap-1">
+                    {a.status === 'pending' && (
+                      <>
+                        <Button
+                          size="sm" variant="success" loading={statusMutation.isPending && statusMutation.variables?.id === a.id}
+                          onClick={() => statusMutation.mutate({ id: a.id, status: 'scheduled' })}
+                        >
+                          <Check className="w-3.5 h-3.5" /> Confirmar
+                        </Button>
+                        <Button
+                          size="sm" variant="outline"
+                          onClick={() => { if (confirm(`¿Rechazar la reunión "${a.title}"? Se le avisará al cliente para que elija otro horario.`)) statusMutation.mutate({ id: a.id, status: 'cancelled' }); }}
+                        >
+                          <X className="w-3.5 h-3.5" /> Rechazar
+                        </Button>
+                      </>
+                    )}
                     <Button variant="ghost" size="icon" onClick={() => setModal(a)} aria-label="Editar cita"><Edit2 className="w-4 h-4" /></Button>
                     <Button
                       variant="ghost" size="icon" className="hover:!bg-red-50 hover:!text-red-600" aria-label="Eliminar cita"

@@ -9,7 +9,17 @@ logger = logging.getLogger(__name__)
 
 
 async def post_webhook(path: str, payload: dict, timeout: float = 10.0) -> tuple[bool, dict, str | None]:
-    """POST a un webhook de n8n. Devuelve (ok, json_respuesta, error).
+    """POST a un webhook de n8n. Devuelve (ok, json_respuesta, error)."""
+    return await call_webhook("POST", path, payload, timeout)
+
+
+async def get_webhook(path: str, timeout: float = 10.0) -> tuple[bool, dict, str | None]:
+    """GET a un webhook de n8n. Devuelve (ok, json_respuesta, error)."""
+    return await call_webhook("GET", path, None, timeout)
+
+
+async def call_webhook(method: str, path: str, payload: dict | None, timeout: float = 10.0) -> tuple[bool, dict, str | None]:
+    """Llama a un webhook de n8n. Devuelve (ok, json_respuesta, error).
 
     Nunca lanza: si n8n está caído devuelve ok=False con el motivo, y cada
     endpoint decide si eso es bloqueante o no. Envía N8N_API_KEY en el header
@@ -22,7 +32,7 @@ async def post_webhook(path: str, payload: dict, timeout: float = 10.0) -> tuple
     headers = {"X-N8N-API-Key": settings.N8N_API_KEY} if settings.N8N_API_KEY else {}
     try:
         async with httpx.AsyncClient() as client:
-            resp = await client.post(url, json=payload, headers=headers, timeout=timeout)
+            resp = await client.request(method, url, json=payload, headers=headers, timeout=timeout)
     except Exception as exc:
         logger.warning("n8n no disponible (%s): %s", url, exc)
         return False, {}, "No se pudo conectar con n8n"
