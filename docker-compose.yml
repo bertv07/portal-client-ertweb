@@ -9,8 +9,8 @@ services:
       POSTGRES_USER: ertweb_user
       POSTGRES_PASSWORD: ertweb_password
       POSTGRES_DB: ertweb_db
-    ports:
-      - "5432:5432"
+    # Sin "ports": Postgres solo es accesible dentro de Docker. Publicar 5432
+    # en un VPS lo deja abierto a internet (Docker se salta el firewall).
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
