@@ -1,9 +1,10 @@
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 
 WORKDIR /app
 
-COPY package.json ./
-RUN npm install
+# Instala exactamente las versiones del package-lock.json (las mismas que se probaron)
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
 
 COPY . ./
 RUN npm run build
